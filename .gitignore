@@ -1,0 +1,41 @@
+﻿# Arquivos e diretórios específicos para .NET Core
+# IDEs
+.DS_Store
+.idea/
+*.sln.iml
+
+.env*
+
+# Visual Studio
+.vs/
+
+# Build e intermediários
+bin/
+obj/
+out/
+
+# Arquivos temporários e de configuração
+*.tmp
+*.log
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Configs locais / secretos
+secrets.json
+
+# Arquivos de publish locais
+publish/
+
+# docker-local (caso você use containers locais)
+docker-compose.override.yml
+.env
+.env.*
+
+# Logs do sistema operacional
+.DS_Store
+Thumbs.db
+
+#SignalRClient Test
+/src/SignalRClient/
