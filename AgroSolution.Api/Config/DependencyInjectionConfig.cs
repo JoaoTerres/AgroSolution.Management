@@ -2,6 +2,8 @@ using AgroSolution.Core.App.Features.AddPlot;
 using AgroSolution.Core.App.Features.CreateProperty;
 using AgroSolution.Core.App.Features.GetByIdPlot;
 using AgroSolution.Core.App.Features.GetProperties;
+using AgroSolution.Core.App.Features.ReceiveIoTData;
+using AgroSolution.Core.App.Validation;
 using AgroSolution.Core.Domain.Interfaces;
 using AgroSolution.Core.Infra.Data;
 using AgroSolution.Core.Infra.Repositories;
@@ -15,12 +17,24 @@ public static class DependencyInjectionConfig
     {
         services.AddDbContext<ManagementDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
-        
+
+        // Repositórios
         services.AddScoped<IPropertyRepository, PropertyRepository>();
+        services.AddScoped<IIoTDataRepository, IoTDataRepository>();
+
+        // Casos de Uso - Property
         services.AddScoped<IGetByIdPlot, GetByIdPlot>();
         services.AddScoped<ICreateProperty, CreateProperty>();
-        services.AddScoped<IAddPlot, AddPlot>();
         services.AddScoped<IGetProperties, GetProperties>();
+
+        // Casos de Uso - Plot
+        services.AddScoped<IAddPlot, AddPlot>();
+
+        // Casos de Uso - IoT Data
+        services.AddScoped<IReceiveIoTData, ReceiveIoTData>();
+
+        // Validadores IoT
+        services.AddSingleton<IoTDeviceValidatorFactory>();
 
         return services;
     }
