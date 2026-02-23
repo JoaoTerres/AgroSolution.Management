@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, '**/feat/**', 'feat/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore AgroSolution.Management.sln
+
+      - name: Build
+        run: dotnet build AgroSolution.Management.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test AgroSolution.Management.sln --configuration Release --no-build --verbosity minimal
