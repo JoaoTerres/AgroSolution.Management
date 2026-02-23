@@ -34,13 +34,24 @@ public class PropertyRepository : IPropertyRepository
             .ToListAsync();
     }
 
-    public void Update(Property property)
+    public async Task<Plot?> GetPlotByIdAsync(Guid plotId)
     {
-        _context.Properties.Update(property);
+        return await _context.Properties
+            .SelectMany(p => p.Plots)
+            .FirstOrDefaultAsync(plot => plot.Id == plotId);
     }
+
+    // public void Update(Property property)
+    // {
+    //     _context.Properties.Update(property);
+    // }
 
     public async Task SaveChangesAsync()
     {
+        foreach (var entry in _context.ChangeTracker.Entries())
+        {
+            Console.WriteLine($"{entry.Entity.GetType().Name} - {entry.State}");
+        }
         await _context.SaveChangesAsync();
     }
 }

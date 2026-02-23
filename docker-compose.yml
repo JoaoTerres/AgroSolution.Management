@@ -1,0 +1,16 @@
+services:
+  db-management:
+    image: postgres:14-alpine
+    container_name: agro_management_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: AgroSolutionDb.Management
+    ports:
+      - "5433:5432"
+    volumes:
+      - mgmt_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  mgmt_postgres_data:

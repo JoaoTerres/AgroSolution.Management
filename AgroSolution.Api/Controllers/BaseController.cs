@@ -22,7 +22,6 @@ public abstract class BaseController : ControllerBase
             });
         }
 
-        // Mapeamento de erros de negócio para Status Codes HTTP
         return result.ErrorMessage switch
         {
             "Propriedade não encontrada." => NotFound(new { success = false, errors = new[] { result.ErrorMessage } }),

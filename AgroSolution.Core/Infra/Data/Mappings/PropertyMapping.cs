@@ -11,6 +11,9 @@ public class PropertyMapping : IEntityTypeConfiguration<Property>
         builder.ToTable("Properties");
 
         builder.HasKey(p => p.Id);
+        
+        builder.Property(p => p.Id)
+            .ValueGeneratedNever();
 
         builder.Property(p => p.Name)
             .IsRequired()
@@ -24,9 +27,13 @@ public class PropertyMapping : IEntityTypeConfiguration<Property>
         
         builder.Property(p => p.ProducerId)
             .IsRequired();
+        
+        builder.Navigation(p => p.Plots)
+            .HasField("_plots")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasMany(p => p.Plots)
-            .WithOne()
+            .WithOne() 
             .HasForeignKey(p => p.PropertyId)
             .OnDelete(DeleteBehavior.Cascade); 
     }

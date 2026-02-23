@@ -7,6 +7,7 @@ public interface IPropertyRepository
     Task AddAsync(Property property);
     Task<Property?> GetByIdAsync(Guid id);
     Task<IEnumerable<Property>> GetByProducerIdAsync(Guid producerId);
-    void Update(Property property);
+    Task<Plot?> GetPlotByIdAsync(Guid plotId);
+    // void Update(Property property);
     Task SaveChangesAsync();
 }
