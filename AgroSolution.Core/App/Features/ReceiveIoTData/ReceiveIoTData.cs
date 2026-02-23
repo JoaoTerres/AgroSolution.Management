@@ -27,13 +27,16 @@ public class ReceiveIoTData : IReceiveIoTData
 {
     private readonly IIoTDataRepository _repository;
     private readonly IoTDeviceValidatorFactory _validatorFactory;
+    private readonly IDeviceRepository _deviceRepository;
 
     public ReceiveIoTData(
         IIoTDataRepository repository,
-        IoTDeviceValidatorFactory validatorFactory)
+        IoTDeviceValidatorFactory validatorFactory,
+        IDeviceRepository deviceRepository)
     {
         _repository = repository;
         _validatorFactory = validatorFactory;
+        _deviceRepository = deviceRepository;
     }
 
     public async Task<Result<IoTDataReceivedDto>> ExecuteAsync(ReceiveIoTDataDto dto)
@@ -42,9 +45,40 @@ public class ReceiveIoTData : IReceiveIoTData
         if (dto == null)
             return Result<IoTDataReceivedDto>.Fail("Dados inválidos recebidos.");
 
-        // Validação 2: PlotId não pode ser vazio
-        if (dto.PlotId == Guid.Empty)
-            return Result<IoTDataReceivedDto>.Fail("ID do talhão é obrigatório.");
+        // Validação 2: Obter PlotId via deviceId caso não venha no DTO
+        Guid plotId;
+        if (dto.PlotId.HasValue && dto.PlotId.Value != Guid.Empty)
+        {
+            plotId = dto.PlotId.Value;
+        }
+        else
+        {
+            // Tentar obter deviceId do DTO ou do JSON bruto
+            var deviceId = dto.DeviceId;
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(dto.RawData);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("device_id", out var d1) && d1.ValueKind == System.Text.Json.JsonValueKind.String)
+                        deviceId = d1.GetString();
+                    else if (root.TryGetProperty("deviceId", out var d2) && d2.ValueKind == System.Text.Json.JsonValueKind.String)
+                        deviceId = d2.GetString();
+                }
+                catch { }
+            }
+
+            if (string.IsNullOrWhiteSpace(deviceId))
+                return Result<IoTDataReceivedDto>.Fail("Identificador do dispositivo (deviceId) é obrigatório quando PlotId não é informado.");
+
+            // Lookup no repositório de dispositivos
+            var foundPlot = await _deviceRepository.GetPlotIdByDeviceAsync(deviceId!);
+            if (!foundPlot.HasValue || foundPlot.Value == Guid.Empty)
+                return Result<IoTDataReceivedDto>.Fail("Dispositivo não encontrado para o deviceId informado.");
+
+            plotId = foundPlot.Value;
+        }
 
         // Validação 3: RawData não pode ser vazio
         if (string.IsNullOrWhiteSpace(dto.RawData))
@@ -65,12 +99,12 @@ public class ReceiveIoTData : IReceiveIoTData
 
         try
         {
-            // Criar entidade de domínio
-            var iotData = new IoTData(
-                dto.PlotId,
-                dto.DeviceType,
-                dto.RawData,
-                dto.DeviceTimestamp ?? DateTime.UtcNow);
+                // Criar entidade de domínio
+                var iotData = new IoTData(
+                    plotId,
+                    dto.DeviceType,
+                    dto.RawData,
+                    dto.DeviceTimestamp ?? DateTime.UtcNow);
 
             // Persistir dados
             var success = await _repository.AddAsync(iotData);

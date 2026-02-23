@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Linq;
 using AgroSolution.Core.App.DTO;
 using AgroSolution.Core.App.Features.ReceiveIoTData;
 using Microsoft.AspNetCore.Mvc;
@@ -22,8 +25,35 @@ public class IoTDataController(IReceiveIoTData receiveIoTData) : BaseController
     /// <response code="500">Erro interno do servidor</response>
     [HttpPost("data")]
     [Produces("application/json")]
-    public async Task<IActionResult> ReceiveData([FromBody] ReceiveIoTDataDto dto)
+    public async Task<IActionResult> ReceiveData()
     {
+        // Ler corpo cru
+        using var reader = new StreamReader(Request.Body);
+        var rawBody = await reader.ReadToEndAsync();
+
+        // Tentar obter tipo do header `X-Device-Type` (int), caso contrário inferir
+        var deviceTypeHeader = Request.Headers["X-Device-Type"].FirstOrDefault();
+        IoTDeviceType deviceType;
+        if (!string.IsNullOrWhiteSpace(deviceTypeHeader) && int.TryParse(deviceTypeHeader, out var dt))
+        {
+            deviceType = (IoTDeviceType)dt;
+        }
+        else
+        {
+            // Inferir simples: se contém 'telemetry' -> WeatherStationNode
+            if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.Contains("\"telemetry\"", StringComparison.OrdinalIgnoreCase))
+                deviceType = IoTDeviceType.WeatherStationNode;
+            else
+                deviceType = IoTDeviceType.TemperatureSensor; // fallback mínimo
+        }
+
+        // Montar DTO: RawData deve conter o JSON completo
+        var dto = new ReceiveIoTDataDto
+        {
+            DeviceType = deviceType,
+            RawData = rawBody
+        };
+
         var result = await receiveIoTData.ExecuteAsync(dto);
         return CustomResponse(result);
     }

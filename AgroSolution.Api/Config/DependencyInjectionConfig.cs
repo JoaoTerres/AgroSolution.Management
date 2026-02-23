@@ -33,6 +33,9 @@ public static class DependencyInjectionConfig
         // Casos de Uso - IoT Data
         services.AddScoped<IReceiveIoTData, ReceiveIoTData>();
 
+        // Device repository (in-memory for local testing)
+        services.AddScoped<IDeviceRepository, InMemoryDeviceRepository>();
+
         // Validadores IoT
         services.AddSingleton<IoTDeviceValidatorFactory>();
 

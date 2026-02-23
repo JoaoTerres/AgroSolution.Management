@@ -15,6 +15,9 @@ public enum IoTDeviceType
     
     /// <summary>Leitor de precipitação em milímetros</summary>
     PrecipitationSensor = 3
+    ,
+    /// <summary>Estação meteorológica com múltiplos sensores (nó)</summary>
+    WeatherStationNode = 4
 }
 
 /// <summary>
@@ -27,7 +30,14 @@ public class ReceiveIoTDataDto
     /// ID do talhão (Plot) para o qual os dados se referem
     /// </summary>
     [JsonPropertyName("plotId")]
-    public required Guid PlotId { get; set; }
+    public Guid? PlotId { get; set; }
+
+    /// <summary>
+    /// Identificador do dispositivo (quando o sensor envia seu próprio id)
+    /// Ex: "agri-sensor-node-042" (mapeado de `device_id` no JSON)
+    /// </summary>
+    [JsonPropertyName("device_id")]
+    public string? DeviceId { get; set; }
 
     /// <summary>
     /// Tipo de dispositivo que enviou os dados
