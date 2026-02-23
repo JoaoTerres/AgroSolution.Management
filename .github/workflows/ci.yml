@@ -34,6 +34,8 @@ jobs:
             /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=coverage/api.cobertura.xml --no-build --verbosity minimal
 
       - name: Validate coverage threshold
+        env:
+          COVERAGE_THRESHOLD: 85
         run: |
           chmod +x .github/scripts/check_coverage.sh
           ./.github/scripts/check_coverage.sh

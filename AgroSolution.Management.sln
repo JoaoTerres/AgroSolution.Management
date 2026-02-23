@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgroSolution.Core", "AgroSo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgroSolution.Api.Tests", "AgroSolution.Api.Tests\AgroSolution.Api.Tests.csproj", "{C3554A9E-A79C-42F1-A31B-3B4CE04E242E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgroSolution.IntegrationTests", "AgroSolution.IntegrationTests\AgroSolution.IntegrationTests.csproj", "{E8564858-9931-4697-8F60-8C9C800EABD5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,18 @@ Global
 		{C3554A9E-A79C-42F1-A31B-3B4CE04E242E}.Release|x64.Build.0 = Release|Any CPU
 		{C3554A9E-A79C-42F1-A31B-3B4CE04E242E}.Release|x86.ActiveCfg = Release|Any CPU
 		{C3554A9E-A79C-42F1-A31B-3B4CE04E242E}.Release|x86.Build.0 = Release|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Debug|x64.Build.0 = Debug|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Debug|x86.Build.0 = Debug|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Release|x64.ActiveCfg = Release|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Release|x64.Build.0 = Release|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Release|x86.ActiveCfg = Release|Any CPU
+		{E8564858-9931-4697-8F60-8C9C800EABD5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
