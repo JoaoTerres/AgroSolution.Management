@@ -25,5 +25,21 @@ jobs:
       - name: Build
         run: dotnet build AgroSolution.Management.sln --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test AgroSolution.Management.sln --configuration Release --no-build --verbosity minimal
+      - name: Test with coverage
+        run: |
+          mkdir -p coverage
+          dotnet test ./AgroSolution.Core.Tests/AgroSolution.Core.Tests.csproj -c Release \
+            /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=coverage/core.cobertura.xml --no-build --verbosity minimal
+          dotnet test ./AgroSolution.Api.Tests/AgroSolution.Api.Tests.csproj -c Release \
+            /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=coverage/api.cobertura.xml --no-build --verbosity minimal
+
+      - name: Validate coverage threshold
+        run: |
+          chmod +x .github/scripts/check_coverage.sh
+          ./.github/scripts/check_coverage.sh
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage
