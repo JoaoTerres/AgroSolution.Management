@@ -33,6 +33,18 @@ jobs:
           dotnet test ./AgroSolution.Api.Tests/AgroSolution.Api.Tests.csproj -c Release \
             /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=coverage/api.cobertura.xml --no-build --verbosity minimal
 
+      - name: Debug coverage files
+        run: |
+          echo 'Coverage directory listing:'
+          ls -la coverage || true
+          for f in coverage/*.cobertura.xml; do
+            if [ -f "$f" ]; then
+              echo "---- start $f ----"
+              sed -n '1,120p' "$f" || true
+              echo "---- end $f ----"
+            fi
+          done || true
+
       - name: Validate coverage threshold
         env:
           COVERAGE_THRESHOLD: 85

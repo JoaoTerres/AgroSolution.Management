@@ -6,6 +6,8 @@ THRESHOLD_PERCENT=${COVERAGE_THRESHOLD:-85}
 
 if [ -z "$(ls -A coverage 2>/dev/null || true)" ]; then
   echo "No coverage files found in coverage/" >&2
+  echo "Coverage directory listing:" >&2
+  ls -la coverage 2>/dev/null || true
   exit 1
 fi
 
