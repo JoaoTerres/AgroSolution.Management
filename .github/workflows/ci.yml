@@ -29,9 +29,11 @@ jobs:
         run: |
           mkdir -p coverage
           dotnet test ./AgroSolution.Core.Tests/AgroSolution.Core.Tests.csproj -c Release \
-            /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=coverage/core.cobertura.xml --no-build --verbosity minimal
+            /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=$(pwd)/coverage/core.cobertura.xml --no-build --verbosity minimal
           dotnet test ./AgroSolution.Api.Tests/AgroSolution.Api.Tests.csproj -c Release \
-            /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=coverage/api.cobertura.xml --no-build --verbosity minimal
+            /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=$(pwd)/coverage/api.cobertura.xml --no-build --verbosity minimal
+          dotnet test ./AgroSolution.IntegrationTests/AgroSolution.IntegrationTests.csproj -c Release \
+            /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=$(pwd)/coverage/integration.cobertura.xml --no-build --verbosity minimal
 
       - name: Debug coverage files
         run: |
