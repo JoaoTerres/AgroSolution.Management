@@ -331,21 +331,21 @@ OBJ_RULE_09: humidity < 30% threshold is the ONLY alert rule required for passin
 Current state of the project mapped to deliverables (as of 2026-02-23):
 
 ```
-FR-01 Authentication          → ❌ NOT STARTED
+FR-01 Authentication          → ✅ COMPLETE (AgroSolution.Identity — POST /api/auth/register + /login, JWT HS256)
 FR-02 Property/Plot CRUD      → ✅ COMPLETE
 FR-03 IoT Ingestion API       → ✅ COMPLETE (InMemoryDevice is acceptable for demo)
 FR-04 Dashboard               → ❌ NOT STARTED (query method exists, endpoint + frontend missing)
 FR-05 Alert Engine            → ❌ NOT STARTED
 
-TR-01 Microservices           → ⚠️ PARTIAL (single service; logical separation exists)
+TR-01 Microservices           → ⚠️ PARTIAL (Identity split done; Management + Worker pending)
 TR-02 Kubernetes              → ❌ NOT STARTED
 TR-03 Observability           → ❌ NOT STARTED
-TR-04 Messaging (RabbitMQ)    → ❌ NOT STARTED (designed in ARCH.md §11)
+TR-04 Messaging (RabbitMQ)    → ⚠️ PARTIAL (docker-compose.yml + topology definitions.json ✅; Worker code ❌)
 TR-05 CI/CD                   → ⚠️ PARTIAL (test pipeline green; Docker+deploy missing)
-TR-06 Best Practices          → ⚠️ PARTIAL (arch OK; [Authorize] + DTO validation missing)
+TR-06 Best Practices          → ⚠️ PARTIAL (arch OK; [Authorize] active; DTO validation missing)
 
 D-01 Architecture Diagram     → ❌ NOT STARTED
 D-02 Infrastructure Demo      → ❌ NOT STARTED
 D-03 CI/CD Demo               → ⚠️ PARTIAL
-D-04 MVP Demo                 → ⚠️ PARTIAL (steps 1, 6, 7, 8 blocked)
+D-04 MVP Demo                 → ⚠️ PARTIAL (steps 6, 7, 8 blocked by FR-05/Worker)
 ```

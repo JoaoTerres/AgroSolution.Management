@@ -11,29 +11,42 @@ SOLUTION: AgroSolution.Management.sln
 ROOT: c:\Users\Guilherme\source\repos\AgroBusinessSolution\AgroSolution.Management\
 
 PROJECTS:
-  [API]          AgroSolution.Api              → AgroSolution.Api\
+  [API]          AgroSolution.Api              → AgroSolution.Api\          ← port 5000/7000
+  [IDENTITY]     AgroSolution.Identity         → AgroSolution.Identity\     ← port 5001/7001 | FR-01 ✅
   [CORE]         AgroSolution.Core             → AgroSolution.Core\
   [TEST_UNIT]    AgroSolution.Core.Tests       → AgroSolution.Core.Tests\
   [TEST_SMOKE]   AgroSolution.Api.Tests        → AgroSolution.Api.Tests\
   [TEST_INT]     AgroSolution.IntegrationTests → AgroSolution.IntegrationTests\  ← EMPTY/SKIPPED in CI
 
 COUPLING RULES (enforced, never violate):
-  Api    → Core    ✅ allowed (via interfaces only)
-  Core   → Api     ❌ FORBIDDEN
-  Core   → Infra   ✅ allowed (Infra lives inside Core project)
-  Tests  → Core    ✅ allowed
-  Tests  → Api     ✅ allowed (smoke only, no coverage threshold)
+  Api      → Core         ✅ allowed (via interfaces only)
+  Identity → Core         ❌ FORBIDDEN (Identity is standalone, own domain)
+  Core     → Api          ❌ FORBIDDEN
+  Core     → Infra        ✅ allowed (Infra lives inside Core project)
+  Tests    → Core         ✅ allowed
+  Tests    → Api          ✅ allowed (smoke only, no coverage threshold)
 
 LAYER INTERNAL STRUCTURE (Core project):
-  Domain/           ← entities, interfaces, AssertValidation, DomainException
-  App/Common/       ← Result<T>
-  App/DTO/          ← input/output DTOs
-  App/Features/     ← use cases (interface + implementation in same folder)
-  App/Validation/   ← IoT validators
-  Infra/Data/       ← ManagementDbContext + EF Mappings
-  Infra/Repositories/ ← concrete implementations
+  Domain/              ← entities, interfaces, AssertValidation, DomainException
+  App/Common/          ← Result<T>
+  App/DTO/             ← input/output DTOs
+  App/Features/        ← use cases (interface + implementation in same folder)
+  App/Validation/      ← IoT validators
+  Infra/Data/          ← ManagementDbContext + EF Mappings
+  Infra/Repositories/  ← concrete implementations
+  Infra/Messaging/     ← RabbitMQSettings (typed config, no implementation yet)
 
-FRAMEWORK: .NET 9 | ORM: EF Core (code-first) | DB: SQL Server (connection in appsettings.Development.json, absent in appsettings.json) | Auth: JWT Bearer
+LAYER INTERNAL STRUCTURE (Identity project — mirrors Core conventions):
+  Domain/              ← Producer entity, AssertValidation, DomainException
+  App/Common/          ← Result<T>
+  App/DTO/             ← LoginDto, RegisterProducerDto, TokenResponseDto
+  App/Features/        ← Login, RegisterProducer (same pattern as Core)
+  Infra/Data/          ← IdentityDbContext + ProducerMapping
+  Infra/Repositories/  ← ProducerRepository
+  Infra/Services/      ← IPasswordHasher (PBKDF2-SHA256), IJwtTokenService (HS256)
+
+FRAMEWORK: .NET 9 | ORM: EF Core (code-first) | DB: PostgreSQL | Auth: JWT Bearer (shared secret between Identity + Api)
+JWT_SHARED_SECRET: appsettings.Development.json → Jwt:SecretKey (same value in both projects)
 ```
 
 ---
@@ -459,29 +472,33 @@ FILE: AgroSolution.Api\Controllers\BaseController.cs
 
 ```
 ETAPA: 1 → COMPLETE (API receives IoT data, validates, persists)
-ETAPA: 2 → PENDING  (RabbitMQ Producer+Consumer Workers)
+ETAPA: 2 → IN_PROGRESS (RabbitMQ docker isolated ✅ | Producer+Consumer Workers pending)
 ETAPA: 3 → PENDING  (Analytics, Kubernetes, Prometheus/Grafana)
+
+COMPLETED_SINCE_ETAPA_1:
+  AgroSolution.Identity ✅ (FR-01) — POST /api/auth/register + POST /api/auth/login
+  docker-compose.yml    ✅ — RabbitMQ + PostgreSQL isolated, topology pre-loaded
 
 ETAPA_2_COMPONENTS (not yet created):
   Worker/IoTDataProducerWorker.cs
     deps: IIoTDataRepository (GetPendingAsync → MarkAsQueued → UpdateAsync)
           IRabbitMQPublisher (new interface to create)
           IPropertyRepository (validate plot existence)
-    trigger: hosted service loop on Pending records
+    trigger: IHostedService loop, interval = RabbitMQSettings.ProducerPollingIntervalMs
 
   Worker/IoTDataConsumerWorker.cs
     deps: IRabbitMQConsumer (new interface)
           IIoTDataProcessor (per-device-type processor, new interface)
           IIoTDataRepository (UpdateAsync → MarkAsProcessed/Failed)
 
-  RabbitMQ exchanges/queues (see IoTDeviceType routing key map in §3)
+  RabbitMQ exchanges/queues → see §14 LOCAL_INFRA for topology details
   exchange: iot.events | type: topic
+  config class: AgroSolution.Core\Infra\Messaging\RabbitMQSettings.cs ← ALL routing keys/queues here
 
   New project: AgroSolution.Worker (BackgroundService host)
     OR: embed workers into AgroSolution.Api as IHostedService
 
 ETAPA_3_COMPONENTS:
-  AgroSolution.Identity (separate project, JWT issuance)
   Kubernetes manifests (k8s/ or helm/)
   Prometheus metrics endpoint (AspNetCore.Diagnostics.HealthChecks or custom middleware)
   Grafana dashboards
@@ -573,4 +590,80 @@ IOT_PATTERNS_REF          → .ai-docs\03-Padroes-Codigo\PADROES_IOT.md
 IOT_FLOWS_REF             → .ai-docs\04-Fluxos\FLUXOS_IOT.md
 MVP_PLAN_REF              → .ai-docs\MVP_Implementation_Plan.md
 ROADMAP_REF               → ROADMAP-ETAPA2-3.md
+
+# Identity project
+IDENTITY_PROGRAM          → AgroSolution.Identity\Program.cs
+IDENTITY_DB_CONTEXT       → AgroSolution.Identity\Infra\Data\IdentityDbContext.cs
+IDENTITY_DI               → AgroSolution.Identity\Config\DependencyInjectionConfig.cs
+IDENTITY_AUTH_CTRL        → AgroSolution.Identity\Controllers\AuthController.cs
+PRODUCER_ENTITY           → AgroSolution.Identity\Domain\Entities\Producer.cs
+PASSWORD_HASHER           → AgroSolution.Identity\Infra\Services\PasswordHasher.cs
+JWT_SERVICE               → AgroSolution.Identity\Infra\Services\JwtTokenService.cs
+PRODUCER_REPO             → AgroSolution.Identity\Infra\Repositories\ProducerRepository.cs
+
+# RabbitMQ / Messaging
+RABBITMQ_SETTINGS         → AgroSolution.Core\Infra\Messaging\RabbitMQSettings.cs
+RABBITMQ_DEFINITIONS      → docker\rabbitmq\definitions.json   ← exchanges/queues/bindings
+RABBITMQ_CONFIG           → docker\rabbitmq\rabbitmq.conf
+
+# Local infra
+DOCKER_COMPOSE            → docker-compose.yml
+DOCKER_ENV_TEMPLATE       → .env.example                       ← copy to .env (gitignored)
+DOCKER_POSTGRES_INIT      → docker\postgres\init.sql
+```
+
+---
+
+## §14 LOCAL_INFRA
+
+```
+FILE: docker-compose.yml
+ENV:  .env.example → copy to .env (gitignored; .env is NOT committed)
+
+SERVICES:
+  postgres
+    image:   postgres:16-alpine
+    port:    ${POSTGRES_PORT:-5432} (host) → 5432 (container)
+    volumes: postgres_data (persistent) + docker/postgres/init.sql
+    creates: agrosolution_management + agrosolution_identity DBs on first start
+    health:  pg_isready
+
+  rabbitmq
+    image:   rabbitmq:3.13-management-alpine
+    ports:   ${RABBITMQ_PORT_AMQP:-5672} (AMQP) + ${RABBITMQ_PORT_MGMT:-15672} (UI)
+    ui:      http://localhost:15672  (user/pass from .env RABBITMQ_DEFAULT_USER/PASS)
+    volumes: rabbitmq_data (persistent) + rabbitmq.conf + definitions.json
+    health:  rabbitmq-diagnostics ping
+
+COMMANDS:
+  docker compose up -d                 → start all infra
+  docker compose up -d rabbitmq        → RabbitMQ only
+  docker compose up -d postgres        → PostgreSQL only
+  docker compose down                  → stop (volumes preserved)
+  docker compose down -v               → stop + wipe volumes (fresh DB)
+  docker compose logs -f rabbitmq      → tail RabbitMQ logs
+  docker compose restart rabbitmq      → apply definitions.json changes
+
+TOPOLOGY (docker/rabbitmq/definitions.json — auto-loaded on first start):
+  Exchange : iot.events       | type=topic  | durable=true
+  Exchange : iot.dead-letter  | type=fanout | durable=true
+  Queue    : queue.temperature   | ttl=24h | bound iot.events → iot.temperature
+  Queue    : queue.humidity      | ttl=24h | bound iot.events → iot.humidity
+  Queue    : queue.precipitation | ttl=24h | bound iot.events → iot.precipitation
+  Queue    : queue.weather       | ttl=24h | bound iot.events → iot.weather
+  Queue    : queue.dead-letter   | no-ttl  | bound iot.dead-letter → #
+
+ADD_NEW_QUEUE:
+  1. docker/rabbitmq/definitions.json  → add entry in "queues" + "bindings"
+  2. AgroSolution.Core\Infra\Messaging\RabbitMQSettings.cs → add Queue/RoutingKey property
+  3. appsettings.json "RabbitMQ" section (both Api + Identity if needed)
+  4. docker compose restart rabbitmq
+
+RABBITMQ_SETTINGS_DI (when Worker/Consumer is implemented — Etapa 2):
+  services.Configure<RabbitMQSettings>(config.GetSection(RabbitMQSettings.SectionName));
+  inject via: IOptions<RabbitMQSettings> or IOptionsSnapshot<RabbitMQSettings>
+  appsettings hierarchy:
+    appsettings.json            → all defaults (routing keys, queues, host, port, username)
+    appsettings.Development.json → Password only (sensitive)
+    Environment variables       → override any field: RABBITMQ__Host, RABBITMQ__Password, etc.
 ```

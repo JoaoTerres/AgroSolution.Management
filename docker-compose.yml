@@ -1,16 +1,89 @@
-services:
-  db-management:
-    image: postgres:14-alpine
-    container_name: agro_management_db
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: dev
-      POSTGRES_DB: AgroSolutionDb.Management
-    ports:
-      - "5433:5432"
-    volumes:
-      - mgmt_postgres_data:/var/lib/postgresql/data
+# ─────────────────────────────────────────────────────────────────────────────
+# AgroSolution — Local Infrastructure
+#
+# Services contained here:
+#   postgres   → Single PostgreSQL instance hosting TWO databases:
+#                  - agrosolution_management  (Properties, Plots, IoTData)
+#                  - agrosolution_identity    (Producers)
+#   rabbitmq   → RabbitMQ with Management UI.
+#                Topology (exchanges/queues/bindings) pre-loaded from
+#                docker/rabbitmq/definitions.json on first start.
+#
+# Usage (copy .env.example → .env first):
+#   docker compose up -d              → start all infra
+#   docker compose up -d rabbitmq     → start only RabbitMQ
+#   docker compose up -d postgres     → start only PostgreSQL
+#   docker compose down               → stop all (data persisted in volumes)
+#   docker compose down -v            → stop + wipe all volumes (fresh start)
+#   docker compose logs -f rabbitmq   → tail RabbitMQ logs
+#
+# Management UIs (when running):
+#   RabbitMQ → http://localhost:15672  (user/pass from .env)
+#   pgAdmin  → use any PG client on localhost:5432
+# ─────────────────────────────────────────────────────────────────────────────
 
+services:
+
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: agrosolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # POSTGRES_DB is intentionally omitted here; databases are created by
+      # the init script below so we don't depend on a single default DB name.
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Persistent data — survives container restarts
+      - postgres_data:/var/lib/postgresql/data
+      # Init script: creates agrosolution_management + agrosolution_identity
+      # databases on first container startup.
+      # To add a new DB: edit docker/postgres/init.sql
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── RabbitMQ ───────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: agrosolution-rabbitmq
+    restart: unless-stopped
+    environment:
+      # Credentials — set in .env (never committed)
+      RABBITMQ_DEFAULT_USER:  ${RABBITMQ_DEFAULT_USER:-agro}
+      RABBITMQ_DEFAULT_PASS:  ${RABBITMQ_DEFAULT_PASS:-agro123}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+    ports:
+      # AMQP protocol — used by .NET producer/consumer workers
+      - "${RABBITMQ_PORT_AMQP:-5672}:5672"
+      # Management UI — http://localhost:15672
+      - "${RABBITMQ_PORT_MGMT:-15672}:15672"
+    volumes:
+      # Persistent data — queued messages survive container restarts
+      - rabbitmq_data:/var/lib/rabbitmq
+      # Custom configuration: heartbeat, max message size, structured logging
+      # To edit: docker/rabbitmq/rabbitmq.conf
+      - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      # Pre-loaded topology: exchange iot.events, queues, bindings, dead-letter
+      # To extend topology: edit docker/rabbitmq/definitions.json
+      # Changes require container restart: docker compose restart rabbitmq
+      - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+# ─── Volumes ──────────────────────────────────────────────────────────────────
 volumes:
-  mgmt_postgres_data:
+  postgres_data:
+    name: agrosolution_postgres_data
+  rabbitmq_data:
+    name: agrosolution_rabbitmq_data
