@@ -334,20 +334,20 @@ Current state of the project mapped to deliverables (as of 2026-02-23):
 FR-01 Authentication          → ✅ COMPLETE (AgroSolution.Identity — POST /api/auth/register + /login, JWT HS256)
 FR-02 Property/Plot CRUD      → ✅ COMPLETE
 FR-03 IoT Ingestion API       → ✅ COMPLETE (InMemoryDevice is acceptable for demo)
-FR-04 Dashboard               → ❌ NOT STARTED (query method exists, endpoint + frontend missing)
-FR-05 Alert Engine            → ❌ NOT STARTED
+FR-04 Dashboard               → ✅ COMPLETE (GET /api/iot/data/{plotId}?from=&to=, 90-day guard, [Authorize])
+FR-05 Alert Engine            → ✅ COMPLETE (DroughtAlertRule: humidity<30% for 24h, GET /api/alerts/{plotId})
 
-TR-01 Microservices           → ⚠️ PARTIAL (Identity split done; Dockerfiles ready for all 3 services; Worker running as standalone host ✅)
+TR-01 Microservices           → ✅ COMPLETE (Identity + Api + Worker as standalone services; Dockerfiles for all 3)
 TR-02 Kubernetes              → ❌ NOT STARTED
 TR-03 Observability           → ❌ NOT STARTED
-TR-04 Messaging (RabbitMQ)    → ✅ COMPLETE (docker-compose + topology + IoTDataProducerWorker + IoTDataConsumerWorker)
+TR-04 Messaging (RabbitMQ)    → ✅ COMPLETE (docker-compose + topology + Producer + Consumer + AlertEngine hook)
 TR-05 CI/CD                   → ⚠️ PARTIAL (test pipeline green; Docker build/push step missing)
-TR-06 Best Practices          → ⚠️ PARTIAL (arch OK; [Authorize] active; DTO validation missing)
+TR-06 Best Practices          → ⚠️ PARTIAL (arch OK; [Authorize] active; DTO annotation validation missing)
 
 D-01 Architecture Diagram     → ❌ NOT STARTED
-D-02 Infrastructure Demo      → ⚠️ PARTIAL (docker-compose up -d starts all infra ✅; Worker containerizable via override.yml ✅)
+D-02 Infrastructure Demo      → ⚠️ PARTIAL (docker-compose up -d starts all infra ✅; app containers via override ✅)
 D-03 CI/CD Demo               → ⚠️ PARTIAL
-D-04 MVP Demo                 → ⚠️ PARTIAL (steps 6, 7, 8 blocked by FR-05)
+D-04 MVP Demo                 → ✅ UNBLOCKED (all 8 demo steps now implementable)
 ```
 
 ### Infrastructure additions (2026-02-24 — Phase 4)
@@ -373,4 +373,27 @@ AgroSolution.Worker/              → new .NET Worker Service project (Microsoft
   Config/DependencyInjectionConfig → wires DbContext, repos, RabbitMQ settings, both workers
   Dockerfile                      → multi-stage build, non-root user agro
 docker-compose.override.yml.example → updated to include agrosolution-worker service
+```
+
+### Alert Engine + Dashboard (2026-02-24 — Phase 6)
+
+```
+AgroSolution.Core/Domain/Entities/Alert.cs              → Alert entity + AlertType enum (Drought, ExtremeHeat, HeavyRain)
+AgroSolution.Core/Domain/Interfaces/IAlertRepository.cs → Add/GetByPlotId/GetActiveByPlotIdAndType/Update
+AgroSolution.Core/Infra/Repositories/AlertRepository.cs → EF implementation
+AgroSolution.Core/Infra/Data/Mappings/AlertMapping.cs   → table: alerts, indexes on plot_id and (plot_id, type, is_active)
+AgroSolution.Core/Infra/Data/Migrations/..002_AddAlerts → ALTER TABLE: create alerts table
+AgroSolution.Core/App/Features/AlertEngine/
+  AlertEngineService.cs   → IAlertEngineService + DroughtRule (all readings < 30% in 24h window, min 2 readings)
+AgroSolution.Core/App/Features/GetAlerts/GetAlerts.cs   → IGetAlerts → Result<IEnumerable<AlertResponseDto>>
+AgroSolution.Core/App/Features/GetIoTDataByRange/
+  GetIoTDataByRange.cs    → IGetIoTDataByRange → validates from<to, max 90 days
+AgroSolution.Core/App/DTO/AlertResponseDto.cs           → From(Alert) factory
+AgroSolution.Core/App/DTO/IoTDataResponseDto.cs         → From(IoTData) factory
+AgroSolution.Api/Controllers/AlertsController.cs        → GET /api/alerts/{plotId:guid} [Authorize]
+AgroSolution.Api/Controllers/IoTDataController.cs       → added GET /api/iot/data/{plotId:guid}?from=&to= [Authorize]
+AgroSolution.Api/Config/DependencyInjectionConfig.cs    → +IAlertRepository, +IAlertEngineService, +GetAlerts, +GetIoTDataByRange
+AgroSolution.Worker/Config/DependencyInjectionConfig.cs → +IAlertRepository + IAlertEngineService
+AgroSolution.Worker/Workers/IoTDataConsumerWorker.cs    → calls AlertEngineService.EvaluateAsync after MarkAsProcessed
+AgroSolution.Core.Tests/Features/AlertAndDashboardTests.cs → 16 new tests (AlertEngine, GetAlerts, GetIoTDataByRange)
 ```

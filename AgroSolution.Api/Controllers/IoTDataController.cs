@@ -2,18 +2,21 @@ using System;
 using System.IO;
 using System.Linq;
 using AgroSolution.Core.App.DTO;
+using AgroSolution.Core.App.Features.GetIoTDataByRange;
 using AgroSolution.Core.App.Features.ReceiveIoTData;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AgroSolution.Api.Controllers;
 
 /// <summary>
-/// Controller para recepção de dados de dispositivos IoT
-/// Endpoints para integração com sensores de temperatura, umidade e precipitação
+/// Controller para recepção e consulta de dados de dispositivos IoT.
 /// </summary>
 [Route("api/iot")]
 [ApiController]
-public class IoTDataController(IReceiveIoTData receiveIoTData) : BaseController
+public class IoTDataController(
+    IReceiveIoTData receiveIoTData,
+    IGetIoTDataByRange getIoTDataByRange) : BaseController
 {
     /// <summary>
     /// Recebe dados de um dispositivo IoT
@@ -66,5 +69,27 @@ public class IoTDataController(IReceiveIoTData receiveIoTData) : BaseController
     public IActionResult Health()
     {
         return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
+    }
+
+    /// <summary>
+    /// Retorna dados IoT de um talhão em um intervalo de tempo (dashboard).
+    /// </summary>
+    /// <param name="plotId">ID do talhão.</param>
+    /// <param name="from">Data/hora inicial (UTC, ISO 8601). Ex: 2026-02-01T00:00:00Z</param>
+    /// <param name="to">Data/hora final (UTC, ISO 8601). Ex: 2026-02-02T00:00:00Z</param>
+    /// <returns>Lista de registros IoT no intervalo.</returns>
+    /// <response code="200">Dados retornados (pode ser lista vazia).</response>
+    /// <response code="400">Parâmetros inválidos ou intervalo excede 90 dias.</response>
+    [HttpGet("data/{plotId:guid}")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetByRange(
+        Guid plotId,
+        [FromQuery] DateTime from,
+        [FromQuery] DateTime to)
+    {
+        var result = await getIoTDataByRange.ExecuteAsync(plotId, from, to);
+        return CustomResponse(result);
     }
 }

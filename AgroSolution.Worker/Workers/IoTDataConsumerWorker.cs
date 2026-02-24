@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using AgroSolution.Core.App.Features.AlertEngine;
 using AgroSolution.Core.Domain.Interfaces;
 using Microsoft.Extensions.Hosting;
 using AgroSolution.Core.Infra.Messaging;
@@ -137,6 +138,20 @@ public sealed class IoTDataConsumerWorker : BackgroundService
 
             data.MarkAsProcessed();
             await repo.UpdateAsync(data);
+
+            // Avalia regras de alerta após processamento bem-sucedido
+            try
+            {
+                var alertEngine = scope.ServiceProvider.GetRequiredService<IAlertEngineService>();
+                await alertEngine.EvaluateAsync(data.PlotId, data.DeviceType);
+            }
+            catch (Exception alertEx)
+            {
+                // Falha no motor de alertas não deve impedir o ack da mensagem
+                _logger.LogError(alertEx,
+                    "ConsumerWorker [{Queue}]: AlertEngine failed for IoTData {Id} — continuing.",
+                    queueName, data.Id);
+            }
 
             channel.BasicAck(ea.DeliveryTag, multiple: false);
 

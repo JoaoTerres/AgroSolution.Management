@@ -1,3 +1,4 @@
+using AgroSolution.Core.App.Features.AlertEngine;
 using AgroSolution.Core.Domain.Interfaces;
 using AgroSolution.Core.Infra.Data;
 using AgroSolution.Core.Infra.Messaging;
@@ -23,6 +24,10 @@ public static class DependencyInjectionConfig
 
         // ── Repositórios (scoped via DbContext) ──────────────────────────────
         services.AddScoped<IIoTDataRepository, IoTDataRepository>();
+        services.AddScoped<IAlertRepository, AlertRepository>();
+
+        // ── Serviços de domínio ───────────────────────────────────────────────
+        services.AddScoped<IAlertEngineService, AlertEngineService>();
 
         // ── RabbitMQ settings ────────────────────────────────────────────────
         services.Configure<RabbitMQSettings>(

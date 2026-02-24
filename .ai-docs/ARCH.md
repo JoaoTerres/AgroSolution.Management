@@ -472,29 +472,22 @@ FILE: AgroSolution.Api\Controllers\BaseController.cs
 
 ```
 ETAPA: 1 → COMPLETE (API receives IoT data, validates, persists)
-ETAPA: 2 → IN_PROGRESS (Workers implemented ✅ | FR-05 Alert Engine pending)
-ETAPA: 3 → PENDING  (Analytics, Kubernetes, Prometheus/Grafana)
+ETAPA: 2 → COMPLETE (Workers, Alert Engine, Dashboard endpoint all implemented)
+ETAPA: 3 → PENDING  (Kubernetes, Prometheus/Grafana)
 
 COMPLETED_SINCE_ETAPA_1:
   AgroSolution.Identity    ✅ (FR-01) — POST /api/auth/register + POST /api/auth/login
   docker-compose.yml       ✅ — PostgreSQL + pgAdmin + RabbitMQ isolated, topology pre-loaded
   AgroSolution.Worker      ✅ (TR-04) — IoTDataProducerWorker + IoTDataConsumerWorker
   Dockerfiles              ✅ — Api, Identity, Worker (multi-stage, non-root user agro)
+  Alert Engine             ✅ (FR-05) — DroughtAlertRule, GET /api/alerts/{plotId}
+  Dashboard endpoint       ✅ (FR-04) — GET /api/iot/data/{plotId}?from=&to=
 
-ETAPA_2_PENDING:
-  FR-05 Alert Engine
-    Alert entity: Id, PlotId, Type(enum), TriggeredAt, ResolvedAt?, Message, IsActive
-    IAlertRepository + AlertRepository (EF) + migration
-    DroughtAlertRule: humidity < 30% for > 24h (uses IIoTDataRepository.GetByPlotIdAndDateRangeAsync)
-    AlertEngineService → invoked by ConsumerWorker after MarkAsProcessed
-    GET /api/alerts/{plotId}
-
-  FR-04 Dashboard
-    GET /api/iot/data/{plotId}?from=&to= (uses IIoTDataRepository.GetByPlotIdAndDateRangeAsync)
-
-  RabbitMQ exchanges/queues → see §14 LOCAL_INFRA for topology details
-  exchange: iot.events | type: topic
-  config class: AgroSolution.Core\Infra\Messaging\RabbitMQSettings.cs ← ALL routing keys/queues here
+ETAPA_3_COMPONENTS:
+  Kubernetes manifests (k8s/ or helm/)
+  Prometheus metrics endpoint (AspNetCore.Diagnostics.HealthChecks or custom middleware)
+  Grafana dashboards
+  InfluxDB or TimescaleDB for time-series (replaces/augments ManagementDbContext for IoTData)
 
 ETAPA_3_COMPONENTS:
   Kubernetes manifests (k8s/ or helm/)
@@ -622,6 +615,21 @@ WORKER_PRODUCER               → AgroSolution.Worker\Workers\IoTDataProducerWor
 WORKER_CONSUMER               → AgroSolution.Worker\Workers\IoTDataConsumerWorker.cs
 WORKER_CONNECTION_MGR         → AgroSolution.Worker\Messaging\RabbitMQConnectionManager.cs
 WORKER_EVENT_MSG              → AgroSolution.Worker\Messaging\IoTEventMessage.cs
+
+# Alert Engine (FR-05)
+ALERT_ENTITY                  → AgroSolution.Core\Domain\Entities\Alert.cs
+ALERT_TYPE_ENUM               → AgroSolution.Core\Domain\Entities\Alert.cs
+I_ALERT_REPOSITORY            → AgroSolution.Core\Domain\Interfaces\IAlertRepository.cs
+ALERT_REPOSITORY              → AgroSolution.Core\Infra\Repositories\AlertRepository.cs
+ALERT_MAPPING                 → AgroSolution.Core\Infra\Data\Mappings\AlertMapping.cs
+ALERT_ENGINE_SERVICE          → AgroSolution.Core\App\Features\AlertEngine\AlertEngineService.cs
+GET_ALERTS_USECASE            → AgroSolution.Core\App\Features\GetAlerts\GetAlerts.cs
+ALERTS_CONTROLLER             → AgroSolution.Api\Controllers\AlertsController.cs
+ALERT_RESPONSE_DTO            → AgroSolution.Core\App\DTO\AlertResponseDto.cs
+
+# Dashboard (FR-04)
+GET_IOT_BY_RANGE_USECASE      → AgroSolution.Core\App\Features\GetIoTDataByRange\GetIoTDataByRange.cs
+IOT_DATA_RESPONSE_DTO         → AgroSolution.Core\App\DTO\IoTDataResponseDto.cs
 ```
 
 ---
