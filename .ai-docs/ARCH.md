@@ -607,9 +607,14 @@ RABBITMQ_DEFINITIONS      → docker\rabbitmq\definitions.json   ← exchanges/q
 RABBITMQ_CONFIG           → docker\rabbitmq\rabbitmq.conf
 
 # Local infra
-DOCKER_COMPOSE            → docker-compose.yml
-DOCKER_ENV_TEMPLATE       → .env.example                       ← copy to .env (gitignored)
-DOCKER_POSTGRES_INIT      → docker\postgres\init.sql
+DOCKER_COMPOSE                → docker-compose.yml
+DOCKER_COMPOSE_OVERRIDE_EX    → docker-compose.override.yml.example  ← copy to .override.yml (gitignored)
+DOCKER_ENV_TEMPLATE           → .env.example                         ← copy to .env (gitignored)
+DOCKER_POSTGRES_INIT          → docker\postgres\init.sql
+DOCKER_PGADMIN_SERVERS        → docker\pgadmin\servers.json           ← pre-registered DB connections
+DOCKERFILE_API                → AgroSolution.Api\Dockerfile
+DOCKERFILE_IDENTITY           → AgroSolution.Identity\Dockerfile
+DOCKERIGNORE                  → .dockerignore
 ```
 
 ---
@@ -617,53 +622,87 @@ DOCKER_POSTGRES_INIT      → docker\postgres\init.sql
 ## §14 LOCAL_INFRA
 
 ```
-FILE: docker-compose.yml
-ENV:  .env.example → copy to .env (gitignored; .env is NOT committed)
+# ── Setup (one-time) ──────────────────────────────────────────────────────────
+cp .env.example .env                # never committed; customise credentials/ports
 
-SERVICES:
-  postgres
-    image:   postgres:16-alpine
-    port:    ${POSTGRES_PORT:-5432} (host) → 5432 (container)
-    volumes: postgres_data (persistent) + docker/postgres/init.sql
-    creates: agrosolution_management + agrosolution_identity DBs on first start
-    health:  pg_isready
+# ── Run infra only (recommended during development) ───────────────────────────
+docker compose up -d                # starts postgres + pgadmin + rabbitmq
+dotnet run --project AgroSolution.Api\AgroSolution.Api.csproj
+dotnet run --project AgroSolution.Identity\AgroSolution.Identity.csproj
 
-  rabbitmq
-    image:   rabbitmq:3.13-management-alpine
-    ports:   ${RABBITMQ_PORT_AMQP:-5672} (AMQP) + ${RABBITMQ_PORT_MGMT:-15672} (UI)
-    ui:      http://localhost:15672  (user/pass from .env RABBITMQ_DEFAULT_USER/PASS)
-    volumes: rabbitmq_data (persistent) + rabbitmq.conf + definitions.json
-    health:  rabbitmq-diagnostics ping
+# ── Run fully containerised (demo/staging/CI) ─────────────────────────────────
+cp docker-compose.override.yml.example docker-compose.override.yml
+docker compose build
+docker compose up -d
+# Api      → http://localhost:8080/swagger
+# Identity → http://localhost:8081/swagger
 
-COMMANDS:
-  docker compose up -d                 → start all infra
-  docker compose up -d rabbitmq        → RabbitMQ only
-  docker compose up -d postgres        → PostgreSQL only
-  docker compose down                  → stop (volumes preserved)
-  docker compose down -v               → stop + wipe volumes (fresh DB)
-  docker compose logs -f rabbitmq      → tail RabbitMQ logs
-  docker compose restart rabbitmq      → apply definitions.json changes
+# ── Day-to-day commands ───────────────────────────────────────────────────────
+docker compose logs -f postgres      → tail PostgreSQL logs
+docker compose logs -f rabbitmq      → tail RabbitMQ logs
+docker compose restart rabbitmq      → apply definitions.json topology changes
+docker compose down                  → stop (volumes preserved)
+docker compose down -v               → stop + wipe all data (fresh start)
 
-TOPOLOGY (docker/rabbitmq/definitions.json — auto-loaded on first start):
-  Exchange : iot.events       | type=topic  | durable=true
-  Exchange : iot.dead-letter  | type=fanout | durable=true
-  Queue    : queue.temperature   | ttl=24h | bound iot.events → iot.temperature
-  Queue    : queue.humidity      | ttl=24h | bound iot.events → iot.humidity
-  Queue    : queue.precipitation | ttl=24h | bound iot.events → iot.precipitation
-  Queue    : queue.weather       | ttl=24h | bound iot.events → iot.weather
-  Queue    : queue.dead-letter   | no-ttl  | bound iot.dead-letter → #
+# ── Services ──────────────────────────────────────────────────────────────────
+postgres    postgres:16-alpine
+  port:    ${POSTGRES_PORT:-5432}
+  volume:  postgres_data (persistent)
+  init:    docker/postgres/init.sql → creates both DBs on first start (idempotent)
+  health:  pg_isready
+
+pgadmin     dpage/pgadmin4:latest
+  port:    ${PGADMIN_PORT:-54320} → http://localhost:54320
+  login:   PGADMIN_EMAIL / PGADMIN_PASSWORD (from .env)
+  servers: docker/pgadmin/servers.json → ManagementDB + IdentityDB pre-registered
+           password prompt on first connect: use POSTGRES_PASSWORD from .env
+  volume:  pgadmin_data (persistent: saved queries, history)
+  depends: postgres (healthy)
+
+rabbitmq    rabbitmq:3.13-management-alpine
+  ports:   ${RABBITMQ_PORT_AMQP:-5672} (AMQP) + ${RABBITMQ_PORT_MGMT:-15672} (UI)
+  ui:      http://localhost:15672 (user/pass from .env)
+  config:  docker/rabbitmq/rabbitmq.conf
+  topology: docker/rabbitmq/definitions.json (auto-loaded on first start)
+  health:  rabbitmq-diagnostics ping
+
+# ── Connection string strategy ────────────────────────────────────────────────
+#   LOCAL  (dotnet run): Host=localhost  ← appsettings.Development.json
+#   DOCKER (container):  Host=postgres   ← env var injected by docker-compose.override.yml
+#
+# ASP.NET Core double-underscore env var override:
+#   ConnectionStrings__ManagementConnection   (AgroSolution.Api)
+#   ConnectionStrings__IdentityConnection     (AgroSolution.Identity)
+# Pre-defined in docker-compose.override.yml.example using values from .env.
+
+# ── Dockerfiles ───────────────────────────────────────────────────────────────
+# AgroSolution.Api/Dockerfile
+#   multi-stage: restore → publish → aspnet:9.0 runtime
+#   port: 8080 | user: agro (non-root) | context: solution root
+#   build: docker build -f AgroSolution.Api/Dockerfile -t agrosolution-api .
+#
+# AgroSolution.Identity/Dockerfile
+#   multi-stage: restore → publish → aspnet:9.0 runtime
+#   port: 8081 | user: agro (non-root) | context: solution root
+#   build: docker build -f AgroSolution.Identity/Dockerfile -t agrosolution-identity .
+
+# ── RabbitMQ topology (docker/rabbitmq/definitions.json) ──────────────────────
+#   Exchange : iot.events      | topic  | durable
+#   Exchange : iot.dead-letter | fanout | durable
+#   Queue    : queue.temperature   ttl=24h → iot.temperature
+#   Queue    : queue.humidity      ttl=24h → iot.humidity
+#   Queue    : queue.precipitation ttl=24h → iot.precipitation
+#   Queue    : queue.weather       ttl=24h → iot.weather
+#   Queue    : queue.dead-letter   no-ttl  → dead-letter exchange
 
 ADD_NEW_QUEUE:
-  1. docker/rabbitmq/definitions.json  → add entry in "queues" + "bindings"
-  2. AgroSolution.Core\Infra\Messaging\RabbitMQSettings.cs → add Queue/RoutingKey property
-  3. appsettings.json "RabbitMQ" section (both Api + Identity if needed)
+  1. docker/rabbitmq/definitions.json → add entry in queues + bindings
+  2. AgroSolution.Core\Infra\Messaging\RabbitMQSettings.cs → add property
+  3. appsettings.json "RabbitMQ" section
   4. docker compose restart rabbitmq
 
-RABBITMQ_SETTINGS_DI (when Worker/Consumer is implemented — Etapa 2):
+RABBITMQ_SETTINGS_DI (Etapa 2 — when Worker is created):
   services.Configure<RabbitMQSettings>(config.GetSection(RabbitMQSettings.SectionName));
-  inject via: IOptions<RabbitMQSettings> or IOptionsSnapshot<RabbitMQSettings>
-  appsettings hierarchy:
-    appsettings.json            → all defaults (routing keys, queues, host, port, username)
-    appsettings.Development.json → Password only (sensitive)
-    Environment variables       → override any field: RABBITMQ__Host, RABBITMQ__Password, etc.
+  inject: IOptions<RabbitMQSettings>
+  env override: RABBITMQ__Host, RABBITMQ__Password, RABBITMQ__Username, etc.
 ```

@@ -1,0 +1,24 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "AgroSolution — Management DB",
+      "Group": "AgroSolution Local",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "agrosolution_management",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "Banco de dados do microsserviço de gestão (Properties, Plots, IoTData)"
+    },
+    "2": {
+      "Name": "AgroSolution — Identity DB",
+      "Group": "AgroSolution Local",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "agrosolution_identity",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "Banco de dados do microsserviço de identidade (Producers)"
+    }
+  }
+}

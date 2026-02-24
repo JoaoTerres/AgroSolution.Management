@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.override.yml.example
+#
+# This file shows how to run the .NET microservices in Docker together with
+# the infra services (postgres, pgadmin, rabbitmq) defined in docker-compose.yml.
+#
+# HOW TO USE:
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#   docker compose build
+#   docker compose up -d
+#
+# docker-compose.override.yml is gitignored — never committed.
+# The .example version IS committed so the team can reproduce the setup.
+#
+# Connection strings automatically use the `postgres` service name (not localhost)
+# via environment variable injection, overriding appsettings.Development.json.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─── AgroSolution.Api (Management microservice) ───────────────────────────
+  agrosolution-api:
+    build:
+      context: .
+      dockerfile: AgroSolution.Api/Dockerfile
+    image: agrosolution-api:local
+    container_name: agrosolution-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+      # ── Database connection (overrides appsettings.Development.json) ───────
+      # Uses `postgres` (docker service name) instead of `localhost`.
+      ConnectionStrings__ManagementConnection: ${MANAGEMENT_CONNECTION:-Host=postgres;Port=5432;Database=agrosolution_management;Username=postgres;Password=postgres}
+
+      # ── JWT (must match AgroSolution.Identity) ─────────────────────────────
+      Jwt__SecretKey:          ${JWT_SECRET:-agrosolution-super-secret-key-2026-x9z8w7v6u5t4s3r2q1p0!@#}
+      Jwt__Issuer:             ${JWT_ISSUER:-AgroSolution.Identity}
+      Jwt__Audience:           ${JWT_AUDIENCE:-AgroSolution.Api}
+      Jwt__ExpirationInHours:  ${JWT_EXPIRATION_HOURS:-24}
+
+      # ── RabbitMQ (overrides appsettings.json default) ──────────────────────
+      RabbitMQ__Host:     rabbitmq
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS:-agro123}
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER:-agro}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ─── AgroSolution.Identity (Auth microservice) ───────────────────────────
+  agrosolution-identity:
+    build:
+      context: .
+      dockerfile: AgroSolution.Identity/Dockerfile
+    image: agrosolution-identity:local
+    container_name: agrosolution-identity
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+      # ── Database connection ────────────────────────────────────────────────
+      ConnectionStrings__IdentityConnection: ${IDENTITY_CONNECTION:-Host=postgres;Port=5432;Database=agrosolution_identity;Username=postgres;Password=postgres}
+
+      # ── JWT ────────────────────────────────────────────────────────────────
+      Jwt__SecretKey:          ${JWT_SECRET:-agrosolution-super-secret-key-2026-x9z8w7v6u5t4s3r2q1p0!@#}
+      Jwt__Issuer:             ${JWT_ISSUER:-AgroSolution.Identity}
+      Jwt__Audience:           ${JWT_AUDIENCE:-AgroSolution.Api}
+      Jwt__ExpirationInHours:  ${JWT_EXPIRATION_HOURS:-24}
+    depends_on:
+      postgres:
+        condition: service_healthy

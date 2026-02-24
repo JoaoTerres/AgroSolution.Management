@@ -337,15 +337,27 @@ FR-03 IoT Ingestion API       → ✅ COMPLETE (InMemoryDevice is acceptable for
 FR-04 Dashboard               → ❌ NOT STARTED (query method exists, endpoint + frontend missing)
 FR-05 Alert Engine            → ❌ NOT STARTED
 
-TR-01 Microservices           → ⚠️ PARTIAL (Identity split done; Management + Worker pending)
+TR-01 Microservices           → ⚠️ PARTIAL (Identity split done; Dockerfiles ready for both services; Worker pending)
 TR-02 Kubernetes              → ❌ NOT STARTED
 TR-03 Observability           → ❌ NOT STARTED
 TR-04 Messaging (RabbitMQ)    → ⚠️ PARTIAL (docker-compose.yml + topology definitions.json ✅; Worker code ❌)
-TR-05 CI/CD                   → ⚠️ PARTIAL (test pipeline green; Docker+deploy missing)
+TR-05 CI/CD                   → ⚠️ PARTIAL (test pipeline green; Docker build/push step missing)
 TR-06 Best Practices          → ⚠️ PARTIAL (arch OK; [Authorize] active; DTO validation missing)
 
 D-01 Architecture Diagram     → ❌ NOT STARTED
-D-02 Infrastructure Demo      → ❌ NOT STARTED
+D-02 Infrastructure Demo      → ⚠️ PARTIAL (docker-compose up -d starts postgres+pgAdmin+rabbitmq ✅; .NET services need override ❌)
 D-03 CI/CD Demo               → ⚠️ PARTIAL
 D-04 MVP Demo                 → ⚠️ PARTIAL (steps 6, 7, 8 blocked by FR-05/Worker)
+```
+
+### Infrastructure additions (2026-02-24 — Phase 4)
+
+```
+docker-compose.yml            → pgAdmin service added (dpage/pgadmin4:latest, port 54320)
+docker/pgadmin/servers.json   → pre-registered Management DB + Identity DB connections
+.env.example                  → PGADMIN_*, MANAGEMENT_CONNECTION, IDENTITY_CONNECTION, JWT_* vars
+AgroSolution.Api/Dockerfile   → multi-stage build, non-root user agro, port 8080
+AgroSolution.Identity/Dockerfile → multi-stage build, non-root user agro, port 8081
+docker-compose.override.yml.example → full containerization (all 4 services) with env var injection
+.dockerignore                 → excludes bin/obj/tests/docs from build context
 ```
