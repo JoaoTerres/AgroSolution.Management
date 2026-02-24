@@ -337,27 +337,40 @@ FR-03 IoT Ingestion API       → ✅ COMPLETE (InMemoryDevice is acceptable for
 FR-04 Dashboard               → ❌ NOT STARTED (query method exists, endpoint + frontend missing)
 FR-05 Alert Engine            → ❌ NOT STARTED
 
-TR-01 Microservices           → ⚠️ PARTIAL (Identity split done; Dockerfiles ready for both services; Worker pending)
+TR-01 Microservices           → ⚠️ PARTIAL (Identity split done; Dockerfiles ready for all 3 services; Worker running as standalone host ✅)
 TR-02 Kubernetes              → ❌ NOT STARTED
 TR-03 Observability           → ❌ NOT STARTED
-TR-04 Messaging (RabbitMQ)    → ⚠️ PARTIAL (docker-compose.yml + topology definitions.json ✅; Worker code ❌)
+TR-04 Messaging (RabbitMQ)    → ✅ COMPLETE (docker-compose + topology + IoTDataProducerWorker + IoTDataConsumerWorker)
 TR-05 CI/CD                   → ⚠️ PARTIAL (test pipeline green; Docker build/push step missing)
 TR-06 Best Practices          → ⚠️ PARTIAL (arch OK; [Authorize] active; DTO validation missing)
 
 D-01 Architecture Diagram     → ❌ NOT STARTED
-D-02 Infrastructure Demo      → ⚠️ PARTIAL (docker-compose up -d starts postgres+pgAdmin+rabbitmq ✅; .NET services need override ❌)
+D-02 Infrastructure Demo      → ⚠️ PARTIAL (docker-compose up -d starts all infra ✅; Worker containerizable via override.yml ✅)
 D-03 CI/CD Demo               → ⚠️ PARTIAL
-D-04 MVP Demo                 → ⚠️ PARTIAL (steps 6, 7, 8 blocked by FR-05/Worker)
+D-04 MVP Demo                 → ⚠️ PARTIAL (steps 6, 7, 8 blocked by FR-05)
 ```
 
 ### Infrastructure additions (2026-02-24 — Phase 4)
 
 ```
-docker-compose.yml            → pgAdmin service added (dpage/pgadmin4:latest, port 54320)
-docker/pgadmin/servers.json   → pre-registered Management DB + Identity DB connections
-.env.example                  → PGADMIN_*, MANAGEMENT_CONNECTION, IDENTITY_CONNECTION, JWT_* vars
-AgroSolution.Api/Dockerfile   → multi-stage build, non-root user agro, port 8080
-AgroSolution.Identity/Dockerfile → multi-stage build, non-root user agro, port 8081
+docker-compose.yml                → pgAdmin service added (dpage/pgadmin4:latest, port 54320)
+docker/pgadmin/servers.json       → pre-registered Management DB + Identity DB connections
+.env.example                      → PGADMIN_*, MANAGEMENT_CONNECTION, IDENTITY_CONNECTION, JWT_* vars
+AgroSolution.Api/Dockerfile       → multi-stage build, non-root user agro, port 8080
+AgroSolution.Identity/Dockerfile  → multi-stage build, non-root user agro, port 8081
 docker-compose.override.yml.example → full containerization (all 4 services) with env var injection
-.dockerignore                 → excludes bin/obj/tests/docs from build context
+.dockerignore                     → excludes bin/obj/tests/docs from build context
+```
+
+### Worker implementation (2026-02-24 — Phase 5)
+
+```
+AgroSolution.Worker/              → new .NET Worker Service project (Microsoft.NET.Sdk.Worker)
+  Workers/IoTDataProducerWorker   → polls GetPendingAsync() → publishes to iot.events exchange
+  Workers/IoTDataConsumerWorker   → subscribes to 4 queues → MarkAsProcessed / MarkAsFailed + DLQ
+  Messaging/RabbitMQConnectionManager → singleton IConnection, DispatchConsumersAsync=true
+  Messaging/IoTEventMessage       → message envelope DTO (IoTDataId, PlotId, DeviceType, RawData)
+  Config/DependencyInjectionConfig → wires DbContext, repos, RabbitMQ settings, both workers
+  Dockerfile                      → multi-stage build, non-root user agro
+docker-compose.override.yml.example → updated to include agrosolution-worker service
 ```

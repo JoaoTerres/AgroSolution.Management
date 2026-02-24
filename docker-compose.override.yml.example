@@ -75,3 +75,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # ─── AgroSolution.Worker (Messaging worker) ──────────────────────────────
+  agrosolution-worker:
+    build:
+      context: .
+      dockerfile: AgroSolution.Worker/Dockerfile
+    image: agrosolution-worker:local
+    container_name: agrosolution-worker
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Development
+
+      # ── Database connection ────────────────────────────────────────────────
+      ConnectionStrings__ManagementConnection: ${MANAGEMENT_CONNECTION:-Host=postgres;Port=5432;Database=agrosolution_management;Username=postgres;Password=postgres}
+
+      # ── RabbitMQ ───────────────────────────────────────────────────────────
+      RabbitMQ__Host:     rabbitmq
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS:-agro123}
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER:-agro}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy

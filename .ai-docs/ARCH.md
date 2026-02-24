@@ -472,31 +472,29 @@ FILE: AgroSolution.Api\Controllers\BaseController.cs
 
 ```
 ETAPA: 1 → COMPLETE (API receives IoT data, validates, persists)
-ETAPA: 2 → IN_PROGRESS (RabbitMQ docker isolated ✅ | Producer+Consumer Workers pending)
+ETAPA: 2 → IN_PROGRESS (Workers implemented ✅ | FR-05 Alert Engine pending)
 ETAPA: 3 → PENDING  (Analytics, Kubernetes, Prometheus/Grafana)
 
 COMPLETED_SINCE_ETAPA_1:
-  AgroSolution.Identity ✅ (FR-01) — POST /api/auth/register + POST /api/auth/login
-  docker-compose.yml    ✅ — RabbitMQ + PostgreSQL isolated, topology pre-loaded
+  AgroSolution.Identity    ✅ (FR-01) — POST /api/auth/register + POST /api/auth/login
+  docker-compose.yml       ✅ — PostgreSQL + pgAdmin + RabbitMQ isolated, topology pre-loaded
+  AgroSolution.Worker      ✅ (TR-04) — IoTDataProducerWorker + IoTDataConsumerWorker
+  Dockerfiles              ✅ — Api, Identity, Worker (multi-stage, non-root user agro)
 
-ETAPA_2_COMPONENTS (not yet created):
-  Worker/IoTDataProducerWorker.cs
-    deps: IIoTDataRepository (GetPendingAsync → MarkAsQueued → UpdateAsync)
-          IRabbitMQPublisher (new interface to create)
-          IPropertyRepository (validate plot existence)
-    trigger: IHostedService loop, interval = RabbitMQSettings.ProducerPollingIntervalMs
+ETAPA_2_PENDING:
+  FR-05 Alert Engine
+    Alert entity: Id, PlotId, Type(enum), TriggeredAt, ResolvedAt?, Message, IsActive
+    IAlertRepository + AlertRepository (EF) + migration
+    DroughtAlertRule: humidity < 30% for > 24h (uses IIoTDataRepository.GetByPlotIdAndDateRangeAsync)
+    AlertEngineService → invoked by ConsumerWorker after MarkAsProcessed
+    GET /api/alerts/{plotId}
 
-  Worker/IoTDataConsumerWorker.cs
-    deps: IRabbitMQConsumer (new interface)
-          IIoTDataProcessor (per-device-type processor, new interface)
-          IIoTDataRepository (UpdateAsync → MarkAsProcessed/Failed)
+  FR-04 Dashboard
+    GET /api/iot/data/{plotId}?from=&to= (uses IIoTDataRepository.GetByPlotIdAndDateRangeAsync)
 
   RabbitMQ exchanges/queues → see §14 LOCAL_INFRA for topology details
   exchange: iot.events | type: topic
   config class: AgroSolution.Core\Infra\Messaging\RabbitMQSettings.cs ← ALL routing keys/queues here
-
-  New project: AgroSolution.Worker (BackgroundService host)
-    OR: embed workers into AgroSolution.Api as IHostedService
 
 ETAPA_3_COMPONENTS:
   Kubernetes manifests (k8s/ or helm/)
@@ -614,7 +612,16 @@ DOCKER_POSTGRES_INIT          → docker\postgres\init.sql
 DOCKER_PGADMIN_SERVERS        → docker\pgadmin\servers.json           ← pre-registered DB connections
 DOCKERFILE_API                → AgroSolution.Api\Dockerfile
 DOCKERFILE_IDENTITY           → AgroSolution.Identity\Dockerfile
+DOCKERFILE_WORKER             → AgroSolution.Worker\Dockerfile
 DOCKERIGNORE                  → .dockerignore
+
+# Worker project
+WORKER_PROGRAM                → AgroSolution.Worker\Program.cs
+WORKER_DI                     → AgroSolution.Worker\Config\DependencyInjectionConfig.cs
+WORKER_PRODUCER               → AgroSolution.Worker\Workers\IoTDataProducerWorker.cs
+WORKER_CONSUMER               → AgroSolution.Worker\Workers\IoTDataConsumerWorker.cs
+WORKER_CONNECTION_MGR         → AgroSolution.Worker\Messaging\RabbitMQConnectionManager.cs
+WORKER_EVENT_MSG              → AgroSolution.Worker\Messaging\IoTEventMessage.cs
 ```
 
 ---
@@ -629,6 +636,7 @@ cp .env.example .env                # never committed; customise credentials/por
 docker compose up -d                # starts postgres + pgadmin + rabbitmq
 dotnet run --project AgroSolution.Api\AgroSolution.Api.csproj
 dotnet run --project AgroSolution.Identity\AgroSolution.Identity.csproj
+dotnet run --project AgroSolution.Worker\AgroSolution.Worker.csproj
 
 # ── Run fully containerised (demo/staging/CI) ─────────────────────────────────
 cp docker-compose.override.yml.example docker-compose.override.yml
