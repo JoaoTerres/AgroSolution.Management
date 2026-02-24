@@ -1,7 +1,7 @@
 using System.Text;
-using AgroSolution.Api.Config;
-using AgroSolution.Api.Middlewares;
-using AgroSolution.Core.Infra.Data;
+using AgroSolution.Identity.Config;
+using AgroSolution.Identity.Infra.Data;
+using AgroSolution.Identity.Middlewares;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -9,8 +9,8 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 // ─── Database ──────────────────────────────────────────────────────────────
-builder.Services.AddDbContext<ManagementDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("ManagementConnection")));
+builder.Services.AddDbContext<IdentityDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("IdentityConnection")));
 
 // ─── Authentication / JWT ──────────────────────────────────────────────────
 var jwtSecret   = builder.Configuration["Jwt:SecretKey"]!;
@@ -39,7 +39,7 @@ builder.Services.AddAuthorization();
 // ─── MVC / Swagger / DI ────────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddSwaggerConfiguration();
-builder.Services.ResolveDependencies(builder.Configuration);
+builder.Services.ResolveDependencies();
 
 // ─── App pipeline ──────────────────────────────────────────────────────────
 var app = builder.Build();
@@ -58,7 +58,7 @@ app.MapControllers();
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<ManagementDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
     db.Database.Migrate();
 }
 
