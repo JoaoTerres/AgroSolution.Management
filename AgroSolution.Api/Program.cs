@@ -5,6 +5,7 @@ using AgroSolution.Core.Infra.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,14 +34,18 @@ builder.Services
 builder.Services.AddAuthorization();
 
 // ─── MVC / Swagger / DI ────────────────────────────────────────────────────
-builder.Services.AddControllers();
-builder.Services.AddSwaggerConfiguration();
+builder.Services.AddControllers();builder.Services.AddHealthChecks();builder.Services.AddSwaggerConfiguration();
 builder.Services.ResolveDependencies(builder.Configuration);
 
 // ─── App pipeline ──────────────────────────────────────────────────────────
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionMiddleware>();
+
+// ─── Prometheus HTTP metrics ────────────────────────────────────────────────
+app.UseHttpMetrics();     // auto-instruments all HTTP requests
+app.MapMetrics();         // exposes GET /metrics (prometheus-net)
+app.MapHealthChecks("/health");
 
 if (app.Environment.IsDevelopment())
     app.UseSwaggerConfiguration();

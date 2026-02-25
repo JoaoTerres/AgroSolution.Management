@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agrosolution-config
+  namespace: agrosolution
+data:
+  # ── JWT ────────────────────────────────────────────────────────────────────
+  JWT__Issuer:   "AgroSolution.Identity"
+  JWT__Audience: "AgroSolution.Api"
+
+  # ── RabbitMQ ────────────────────────────────────────────────────────────────
+  RABBITMQ__HOST:     "agrosolution-rabbitmq"
+  RABBITMQ__PORT:     "5672"
+  RABBITMQ__USERNAME: "agro"
+
+  # ── Postgres ────────────────────────────────────────────────────────────────
+  POSTGRES_HOST: "agrosolution-postgres"
+  POSTGRES_PORT: "5432"
+
+  # ── ASP.NET Core ────────────────────────────────────────────────────────────
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_HTTP_PORTS:  "8080"

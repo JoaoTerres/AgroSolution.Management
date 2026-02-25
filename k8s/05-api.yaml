@@ -1,0 +1,73 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AgroSolution.Api — Deployment + Service
+# Image: ghcr.io/joaotorres/agrosolution-api:latest
+# Port:  8080
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrosolution-api
+  namespace: agrosolution
+  labels:
+    app: agrosolution-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agrosolution-api
+  template:
+    metadata:
+      labels:
+        app: agrosolution-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "8080"
+        prometheus.io/path:   "/metrics"
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/joaotorres/agrosolution-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: agrosolution-config
+            - secretRef:
+                name: agrosolution-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agrosolution-api
+  namespace: agrosolution
+  labels:
+    app: agrosolution-api
+spec:
+  selector:
+    app: agrosolution-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

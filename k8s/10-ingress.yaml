@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Ingress — nginx ingress controller
+#
+# Prerequisites (minikube):
+#   minikube addons enable ingress
+#
+# Local DNS (/etc/hosts or C:\Windows\System32\drivers\etc\hosts):
+#   $(minikube ip)  api.agrosolution.local
+#   $(minikube ip)  identity.agrosolution.local
+#   $(minikube ip)  grafana.agrosolution.local
+#   $(minikube ip)  prometheus.agrosolution.local
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agrosolution-ingress
+  namespace: agrosolution
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+    # ── AgroSolution API ───────────────────────────────────────────────────────
+    - host: api.agrosolution.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agrosolution-api
+                port:
+                  number: 80
+
+    # ── Identity (Auth) ────────────────────────────────────────────────────────
+    - host: identity.agrosolution.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agrosolution-identity
+                port:
+                  number: 80
+
+    # ── Grafana ────────────────────────────────────────────────────────────────
+    - host: grafana.agrosolution.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+
+    # ── Prometheus ─────────────────────────────────────────────────────────────
+    - host: prometheus.agrosolution.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090

@@ -1,0 +1,146 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# RabbitMQ 3.13 — Deployment + PVC + Service (AMQP + Management UI)
+# Topology loaded from definitions.json via ConfigMap
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-pvc
+  namespace: agrosolution
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  namespace: agrosolution
+data:
+  rabbitmq.conf: |
+    loopback_users.guest = false
+    load_definitions = /etc/rabbitmq/definitions.json
+
+  definitions.json: |
+    {
+      "users": [
+        { "name": "agro", "password": "agro123", "tags": "administrator" }
+      ],
+      "vhosts": [{ "name": "/" }],
+      "permissions": [
+        {
+          "user": "agro", "vhost": "/",
+          "configure": ".*", "write": ".*", "read": ".*"
+        }
+      ],
+      "exchanges": [
+        { "name": "iot.events",      "vhost": "/", "type": "topic",  "durable": true, "auto_delete": false, "arguments": {} },
+        { "name": "iot.dead-letter", "vhost": "/", "type": "fanout", "durable": true, "auto_delete": false, "arguments": {} }
+      ],
+      "queues": [
+        { "name": "queue.temperature",   "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-dead-letter-exchange": "iot.dead-letter", "x-message-ttl": 86400000 } },
+        { "name": "queue.humidity",      "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-dead-letter-exchange": "iot.dead-letter", "x-message-ttl": 86400000 } },
+        { "name": "queue.precipitation", "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-dead-letter-exchange": "iot.dead-letter", "x-message-ttl": 86400000 } },
+        { "name": "queue.weather",       "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-dead-letter-exchange": "iot.dead-letter", "x-message-ttl": 86400000 } },
+        { "name": "queue.dead-letter",   "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+      ],
+      "bindings": [
+        { "source": "iot.events", "vhost": "/", "destination": "queue.temperature",   "destination_type": "queue", "routing_key": "iot.temperature",   "arguments": {} },
+        { "source": "iot.events", "vhost": "/", "destination": "queue.humidity",      "destination_type": "queue", "routing_key": "iot.humidity",      "arguments": {} },
+        { "source": "iot.events", "vhost": "/", "destination": "queue.precipitation", "destination_type": "queue", "routing_key": "iot.precipitation", "arguments": {} },
+        { "source": "iot.events", "vhost": "/", "destination": "queue.weather",       "destination_type": "queue", "routing_key": "iot.weather",       "arguments": {} },
+        { "source": "iot.dead-letter", "vhost": "/", "destination": "queue.dead-letter", "destination_type": "queue", "routing_key": "#", "arguments": {} }
+      ]
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrosolution-rabbitmq
+  namespace: agrosolution
+  labels:
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management-alpine
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "agro"
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: agrosolution-secrets
+                  key: RABBITMQ__PASSWORD
+          volumeMounts:
+            - name: rabbitmq-config
+              mountPath: /etc/rabbitmq/rabbitmq.conf
+              subPath: rabbitmq.conf
+            - name: rabbitmq-config
+              mountPath: /etc/rabbitmq/definitions.json
+              subPath: definitions.json
+            - name: rabbitmq-storage
+              mountPath: /var/lib/rabbitmq
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "ping"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "ping"]
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: rabbitmq-config
+          configMap:
+            name: rabbitmq-config
+        - name: rabbitmq-storage
+          persistentVolumeClaim:
+            claimName: rabbitmq-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agrosolution-rabbitmq
+  namespace: agrosolution
+  labels:
+    app: rabbitmq
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672

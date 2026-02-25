@@ -1,0 +1,73 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AgroSolution.Identity — Deployment + Service
+# Image: ghcr.io/joaotorres/agrosolution-identity:latest
+# Port:  8081
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrosolution-identity
+  namespace: agrosolution
+  labels:
+    app: agrosolution-identity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agrosolution-identity
+  template:
+    metadata:
+      labels:
+        app: agrosolution-identity
+    spec:
+      containers:
+        - name: identity
+          image: ghcr.io/joaotorres/agrosolution-identity:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8081
+              name: http
+          envFrom:
+            - configMapRef:
+                name: agrosolution-config
+            - secretRef:
+                name: agrosolution-secrets
+          env:
+            # Identity uses port 8081 — override the default 8080 from ConfigMap
+            - name: ASPNETCORE_HTTP_PORTS
+              value: "8081"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agrosolution-identity
+  namespace: agrosolution
+  labels:
+    app: agrosolution-identity
+spec:
+  selector:
+    app: agrosolution-identity
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8081

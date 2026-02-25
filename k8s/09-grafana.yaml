@@ -1,0 +1,210 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Grafana — Deployment + Service
+# Pre-configured datasource (Prometheus) via ConfigMap
+# Login: admin / admin123 (change in production)
+# UI: http://grafana.agrosolution.local (Ingress)
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: agrosolution
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: false
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: agrosolution
+data:
+  dashboard-provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: agrosolution
+        orgId: 1
+        folder: AgroSolution
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-iot
+  namespace: agrosolution
+data:
+  iot-ingestion.json: |
+    {
+      "__inputs": [],
+      "__requires": [{"type": "grafana","id": "grafana","name": "Grafana","version": "9.0.0"}],
+      "annotations": {"list": []},
+      "description": "AgroSolution IoT Ingestion Dashboard",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "DS_PROMETHEUS"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {}}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "DS_PROMETHEUS"},
+              "expr": "rate(http_requests_received_total{job=\"agrosolution-api\"}[1m])",
+              "interval": "",
+              "legendFormat": "{{method}} {{route}} {{status_code}}",
+              "refId": "A"
+            }
+          ],
+          "title": "HTTP Request Rate (req/s)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "DS_PROMETHEUS"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {}}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "DS_PROMETHEUS"},
+              "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"agrosolution-api\"}[5m]))",
+              "interval": "",
+              "legendFormat": "p99 latency",
+              "refId": "A"
+            }
+          ],
+          "title": "HTTP p99 Latency",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "DS_PROMETHEUS"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {}}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "id": 3,
+          "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "DS_PROMETHEUS"},
+              "expr": "rate(http_requests_received_total{job=\"agrosolution-api\", route=~\"/api/iot.*\"}[1m])",
+              "interval": "",
+              "legendFormat": "IoT {{route}} {{status_code}}",
+              "refId": "A"
+            }
+          ],
+          "title": "IoT Ingestion Rate (/api/iot/data)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "DS_PROMETHEUS"},
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 80}]}, "unit": "short"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "id": 4,
+          "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "DS_PROMETHEUS"},
+              "expr": "rate(http_requests_received_total{job=\"agrosolution-api\", status_code=~\"5..\"}[5m]) * 100",
+              "interval": "",
+              "legendFormat": "Error rate %",
+              "refId": "A"
+            }
+          ],
+          "title": "5xx Error Rate (%)",
+          "type": "stat"
+        }
+      ],
+      "schemaVersion": 38,
+      "tags": ["agrosolution", "iot"],
+      "title": "AgroSolution IoT Ingestion",
+      "uid": "agrosolution-iot",
+      "version": 1
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: agrosolution
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.4.2
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin123"
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
+              value: "/var/lib/grafana/dashboards/iot-ingestion.json"
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboard-iot
+              mountPath: /var/lib/grafana/dashboards
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboard-iot
+          configMap:
+            name: grafana-dashboard-iot
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: agrosolution
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
