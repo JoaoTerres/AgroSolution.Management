@@ -177,16 +177,31 @@ jobs:
           kubectl apply --dry-run=client -f k8s/09-grafana.yaml
           kubectl apply --dry-run=client -f k8s/10-ingress.yaml
 
+      # ── Detect optional secrets (secrets context is NOT valid in if: conditions)
+      - name: Detect optional secrets
+        id: check-secrets
+        run: |
+          if [ -n "${{ secrets.KUBECONFIG }}" ]; then
+            echo "has_kubeconfig=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_kubeconfig=false" >> $GITHUB_OUTPUT
+          fi
+          if [ -n "${{ secrets.API_SMOKE_URL }}" ]; then
+            echo "has_smoke_url=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_smoke_url=false" >> $GITHUB_OUTPUT
+          fi
+
       # ── Real deploy (only when KUBECONFIG secret is configured) ──────────
       - name: Write kubeconfig
-        if: ${{ secrets.KUBECONFIG != '' }}
+        if: steps.check-secrets.outputs.has_kubeconfig == 'true'
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
 
       - name: Apply manifests (kubectl apply)
-        if: ${{ secrets.KUBECONFIG != '' }}
+        if: steps.check-secrets.outputs.has_kubeconfig == 'true'
         run: |
           kubectl apply -f k8s/00-namespace.yaml
           kubectl apply -f k8s/01-configmap.yaml
@@ -201,14 +216,14 @@ jobs:
           kubectl apply -f k8s/10-ingress.yaml
 
       - name: Wait for rollout
-        if: ${{ secrets.KUBECONFIG != '' }}
+        if: steps.check-secrets.outputs.has_kubeconfig == 'true'
         run: |
           kubectl rollout status deployment/agrosolution-api      -n agrosolution --timeout=120s
           kubectl rollout status deployment/agrosolution-identity  -n agrosolution --timeout=120s
           kubectl rollout status deployment/agrosolution-worker    -n agrosolution --timeout=120s
 
       - name: Smoke check (deployed cluster)
-        if: ${{ secrets.KUBECONFIG != '' && secrets.API_SMOKE_URL != '' }}
+        if: steps.check-secrets.outputs.has_kubeconfig == 'true' && steps.check-secrets.outputs.has_smoke_url == 'true'
         run: |
           curl -sf "${{ secrets.API_SMOKE_URL }}/health" \
             -H "Accept: application/json" \
