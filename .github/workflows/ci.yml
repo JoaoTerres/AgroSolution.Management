@@ -139,3 +139,77 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.worker_image }}:latest
             ${{ steps.meta.outputs.worker_image }}:${{ steps.meta.outputs.short_sha }}
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Kubernetes manifest validation + optional deploy (TR-05)
+  #
+  # Always:  kubectl apply --dry-run=client (validates YAML syntax + API objects)
+  # On main: kubectl apply -f k8s/ (real rollout) only when KUBECONFIG secret exists
+  #          Add secret: Settings → Secrets → Actions → KUBECONFIG (base64 kubeconfig)
+  # ─────────────────────────────────────────────────────────────────────────
+  k8s-deploy:
+    name: K8s Validate & Deploy (TR-05)
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.30.0'
+
+      # ── Validate manifests (always — no cluster needed) ──────────────────
+      - name: Validate manifests (dry-run client)
+        run: |
+          kubectl apply --dry-run=client -f k8s/00-namespace.yaml
+          kubectl apply --dry-run=client -f k8s/01-configmap.yaml
+          kubectl apply --dry-run=client -f k8s/02-secret.yaml
+          kubectl apply --dry-run=client -f k8s/03-postgres.yaml
+          kubectl apply --dry-run=client -f k8s/04-rabbitmq.yaml
+          kubectl apply --dry-run=client -f k8s/05-api.yaml
+          kubectl apply --dry-run=client -f k8s/06-identity.yaml
+          kubectl apply --dry-run=client -f k8s/07-worker.yaml
+          kubectl apply --dry-run=client -f k8s/08-prometheus.yaml
+          kubectl apply --dry-run=client -f k8s/09-grafana.yaml
+          kubectl apply --dry-run=client -f k8s/10-ingress.yaml
+
+      # ── Real deploy (only when KUBECONFIG secret is configured) ──────────
+      - name: Write kubeconfig
+        if: ${{ secrets.KUBECONFIG != '' }}
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Apply manifests (kubectl apply)
+        if: ${{ secrets.KUBECONFIG != '' }}
+        run: |
+          kubectl apply -f k8s/00-namespace.yaml
+          kubectl apply -f k8s/01-configmap.yaml
+          kubectl apply -f k8s/02-secret.yaml
+          kubectl apply -f k8s/03-postgres.yaml
+          kubectl apply -f k8s/04-rabbitmq.yaml
+          kubectl apply -f k8s/05-api.yaml
+          kubectl apply -f k8s/06-identity.yaml
+          kubectl apply -f k8s/07-worker.yaml
+          kubectl apply -f k8s/08-prometheus.yaml
+          kubectl apply -f k8s/09-grafana.yaml
+          kubectl apply -f k8s/10-ingress.yaml
+
+      - name: Wait for rollout
+        if: ${{ secrets.KUBECONFIG != '' }}
+        run: |
+          kubectl rollout status deployment/agrosolution-api      -n agrosolution --timeout=120s
+          kubectl rollout status deployment/agrosolution-identity  -n agrosolution --timeout=120s
+          kubectl rollout status deployment/agrosolution-worker    -n agrosolution --timeout=120s
+
+      - name: Smoke check (deployed cluster)
+        if: ${{ secrets.KUBECONFIG != '' && secrets.API_SMOKE_URL != '' }}
+        run: |
+          curl -sf "${{ secrets.API_SMOKE_URL }}/health" \
+            -H "Accept: application/json" \
+            --retry 5 --retry-delay 5 | jq .

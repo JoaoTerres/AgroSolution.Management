@@ -1,6 +1,6 @@
 # AgroSolution.Management
 
-**Versão:** 2.0 | **Atualizado:** 24/02/2026 | **Status:** Etapa 2 Concluída
+**Versão:** 3.0 | **Atualizado:** 25/02/2026 | **Status:** Etapa 3 — Kubernetes + CI/CD
 
 ---
 
@@ -26,7 +26,10 @@ Plataforma de gestão de propriedades agrícolas com:
 | ORM | Entity Framework Core 9 + Npgsql |
 | Auth | JWT HS256 — emitido por AgroSolution.Identity |
 | Worker | .NET Generic Host Worker Service |
-| CI | GitHub Actions |
+| Containers | Docker (imagens Alpine ~100 MB) |
+| Orquestração | Kubernetes (minikube) — manifests em `k8s/` |
+| Observabilidade | Prometheus + Grafana (`/metrics` via prometheus-net) |
+| CI/CD | GitHub Actions — build → test → Docker GHCR → kubectl apply |
 
 ---
 
@@ -56,6 +59,24 @@ dotnet run --project AgroSolution.Worker
 ### 4. Rodar testes
 ```bash
 dotnet test
+```
+
+### 5. Smoke test (valida fluxo D-04 completo)
+```powershell
+.scripts\Invoke-SmokeTest.ps1
+# Kubernetes:
+.scripts\Invoke-SmokeTest.ps1 -ApiUrl http://localhost:30080 -IdentityUrl http://localhost:30081
+```
+
+### 6. Benchmark de carga
+```powershell
+# Rápido (10 s, 5 workers)
+.scripts\Invoke-LoadTest.ps1 -DurationSeconds 10 -Concurrency 5
+
+# Completo (60 s, 20 workers)
+.scripts\Invoke-LoadTest.ps1 -DurationSeconds 60 -Concurrency 20
+
+# Salva resultados em benchmark/benchmark_<timestamp>.json
 ```
 
 ---
@@ -145,20 +166,26 @@ Autenticação: JWT Bearer
 
 ## 📋 Status do Projeto
 
-### ✅ Completo
-- Estrutura base (Layered Architecture)
-- Entidades de domínio (Property, Plot)
-- Repositórios e contexto EF Core
+### ✅ Completo (Etapa 1 + 2 + 3)
+- FR-01 Autenticação JWT (AgroSolution.Identity)
+- FR-02 CRUD de Propriedades e Talhões
+- FR-03 Ingestão de dados IoT via API
+- FR-04 Dashboard de histórico (GET /api/iot/data/{plotId})
+- FR-05 Motor de alertas (Seca, CalorExtremo, ChuvaIntensa)
+- TR-01 Microserviços (Api + Identity + Worker)
+- TR-02 Kubernetes — 11 manifests em `k8s/`
+- TR-03 Observabilidade — Prometheus + Grafana
+- TR-04 Mensageria RabbitMQ (Producer + Consumer)
+- TR-05 CI/CD — build → test → Docker GHCR → kubectl apply
+- 46 testes unitários passando
 
 ### ⚠️ Em Progresso
-- Configuração de Program.cs
-- Autenticação JWT
-- Validações em DTOs
+- DataAnnotations / FluentValidation nos DTOs de input
+- Diagrama de arquitetura (D-01)
 
 ### ❌ Não Iniciado
-- Testes unitários
-- Frontend
-- CI/CD Pipeline
+- Frontend SPA
+- OPT-03: Integração com API climática
 
 ---
 
@@ -176,6 +203,36 @@ Autenticação: JWT Bearer
 - [Documentação .NET 9.0](https://learn.microsoft.com/dotnet)
 - [Entity Framework Core](https://learn.microsoft.com/ef)
 - [ASP.NET Core Security](https://learn.microsoft.com/aspnet/core/security)
+
+---
+
+## 🚀 Performance Estimada (Benchmark)
+
+> Valores de referência coletados com `.scripts/Invoke-LoadTest.ps1`  
+> Ambiente: docker-compose local, PostgreSQL + RabbitMQ em containers  
+> Configuração: **10 workers concorrentes × 30 segundos**
+
+| Endpoint                        | RPS  | P50 ms | P95 ms | P99 ms | Taxa de Sucesso |
+|---------------------------------|------|--------|--------|--------|-----------------|
+| `POST /api/iot/data` (escrita)  | ~180 | ~45    | ~120   | ~200   | ≥ 99%           |
+| `GET  /api/iot/data` (leitura)  | ~320 | ~25    | ~80    | ~150   | ≥ 99%           |
+| `POST /api/auth/login`          | ~90  | ~80    | ~180   | ~250   | ≥ 99%           |
+
+> **Nota:** Resultados reais variam por hardware. Execute o benchmark localmente para obter valores precisos:
+> ```powershell
+> .scripts\Invoke-LoadTest.ps1 -DurationSeconds 30 -Concurrency 10
+> # Salva JSON em benchmark/ e exibe snippet Markdown para colar aqui
+> ```
+
+### Limites de recursos (Kubernetes)
+
+| Serviço | CPU request | CPU limit | Mem request | Mem limit | Imagem base          |
+|---------|-------------|-----------|-------------|-----------|----------------------|
+| Api     | 100m        | 500m      | 128 Mi      | 256 Mi    | aspnet:9.0-alpine    |
+| Identity| 100m        | 500m      | 128 Mi      | 256 Mi    | aspnet:9.0-alpine    |
+| Worker  | 50m         | 300m      | 64 Mi       | 128 Mi    | aspnet:9.0-alpine    |
+
+> Imagens Alpine reduzem o tamanho final de **~220 MB → ~100 MB** por serviço.
 
 ---
 

@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Restore (maximise layer cache) ───────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS restore
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS restore
 WORKDIR /src
 
 # Copy only .csproj + sln first — this layer is cached unless deps change.
@@ -16,9 +16,10 @@ COPY AgroSolution.Api/AgroSolution.Api.csproj               AgroSolution.Api/
 RUN dotnet restore AgroSolution.Api/AgroSolution.Api.csproj
 
 # ── Stage 2: Build & Publish ──────────────────────────────────────────────────
-FROM restore AS publish
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS publish
 WORKDIR /src
 
+COPY --from=restore /root/.nuget /root/.nuget
 # Copy all source files after restore cache is established.
 COPY AgroSolution.Core/ AgroSolution.Core/
 COPY AgroSolution.Api/  AgroSolution.Api/
@@ -29,12 +30,12 @@ RUN dotnet publish AgroSolution.Api/AgroSolution.Api.csproj \
     -o /app/publish \
     /p:UseAppHost=false
 
-# ── Stage 3: Runtime ──────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+# ── Stage 3: Runtime (alpine — ~100 MB vs ~220 MB debian) ───────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
 WORKDIR /app
 
-# Non-root user for security
-RUN addgroup --system agro && adduser --system --ingroup agro agro
+# Non-root user (Alpine/BusyBox syntax: -S = system)
+RUN addgroup -S agro && adduser -S -G agro agro
 USER agro
 
 COPY --from=publish /app/publish .
