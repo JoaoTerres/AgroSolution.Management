@@ -48,7 +48,8 @@ public class AlertEngineServiceTests
     [Fact]
     public async Task EvaluateAsync_TemperatureDevice_SkipsDroughtEvaluation()
     {
-        // Arrange — no repo calls expected for non-humidity device type
+        // Arrange — TemperatureSensor triggers ExtremeHeat rule, not Drought rule
+        // With 0 readings, ExtremeHeat returns early (count < 3 min)
         _iotRepoMock
             .Setup(r => r.GetByPlotIdAndDateRangeAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
             .ReturnsAsync(Enumerable.Empty<IoTData>());
@@ -56,10 +57,10 @@ public class AlertEngineServiceTests
         // Act
         await _sut.EvaluateAsync(_plotId, IoTDeviceType.TemperatureSensor);
 
-        // Assert — no IoT repo calls for temperature-only data
+        // Assert — no Drought or any alert created; IoT repo called once (ExtremeHeat window query)
         _iotRepoMock.Verify(
             r => r.GetByPlotIdAndDateRangeAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()),
-            Times.Never);
+            Times.Once);
         _alertRepoMock.Verify(r => r.AddAsync(It.IsAny<Alert>()), Times.Never);
     }
 
@@ -200,6 +201,334 @@ public class AlertEngineServiceTests
             It.Is<Alert>(a => !a.IsActive && a.ResolvedAt.HasValue)),
             Times.Once);
         _alertRepoMock.Verify(r => r.AddAsync(It.IsAny<Alert>()), Times.Never);
+    }
+
+    // ── ExtremeHeatRule tests ─────────────────────────────────────────────────
+
+    private static IoTData MakeTemperatureData(Guid plotId, float tempValue, DateTime? at = null)
+    {
+        var d = new IoTData(
+            plotId,
+            IoTDeviceType.TemperatureSensor,
+            $"{{\"value\":{tempValue},\"unit\":\"C\"}}",
+            at ?? DateTime.UtcNow);
+        d.MarkAsQueued("test-queue");
+        d.MarkAsProcessed();
+        return d;
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_HumidityDevice_SkipsExtremeHeatEvaluation()
+    {
+        // Arrange — HumiditySensor should not trigger ExtremeHeat rule
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(Enumerable.Empty<IoTData>());
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, It.IsAny<AlertType>()))
+            .ReturnsAsync((Alert?)null);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.HumiditySensor);
+
+        // Assert — ExtremeHeat alert not created
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.ExtremeHeat)), Times.Never);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ExtremeHeat_InsufficientReadings_DoesNotCreateAlert()
+    {
+        // Arrange — only 2 readings (below minimum of 3)
+        var readings = new[]
+        {
+            MakeTemperatureData(_plotId, 40f),
+            MakeTemperatureData(_plotId, 41f)
+        };
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.ExtremeHeat))
+            .ReturnsAsync((Alert?)null);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.TemperatureSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.ExtremeHeat)), Times.Never);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ExtremeHeat_AllReadingsAboveThreshold_CreatesAlert()
+    {
+        // Arrange — 3 readings all > 38°C
+        var readings = new[]
+        {
+            MakeTemperatureData(_plotId, 39f),
+            MakeTemperatureData(_plotId, 41f),
+            MakeTemperatureData(_plotId, 42f)
+        };
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.ExtremeHeat))
+            .ReturnsAsync((Alert?)null);
+
+        _alertRepoMock
+            .Setup(r => r.AddAsync(It.IsAny<Alert>()))
+            .ReturnsAsync(true);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.TemperatureSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.AddAsync(
+            It.Is<Alert>(a => a.Type == AlertType.ExtremeHeat && a.PlotId == _plotId && a.IsActive)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ExtremeHeat_ReadingsBelowThreshold_DoesNotCreateAlert()
+    {
+        // Arrange — one reading below threshold
+        var readings = new[]
+        {
+            MakeTemperatureData(_plotId, 39f),
+            MakeTemperatureData(_plotId, 37f), // below 38°C
+            MakeTemperatureData(_plotId, 40f)
+        };
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.ExtremeHeat))
+            .ReturnsAsync((Alert?)null);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.TemperatureSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.ExtremeHeat)), Times.Never);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ExtremeHeat_ActiveAlertExists_DoesNotDuplicate()
+    {
+        // Arrange — existing active ExtremeHeat alert
+        var readings = new[]
+        {
+            MakeTemperatureData(_plotId, 39f),
+            MakeTemperatureData(_plotId, 41f),
+            MakeTemperatureData(_plotId, 42f)
+        };
+
+        var existingAlert = new Alert(_plotId, AlertType.ExtremeHeat, "existing heat alert");
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.ExtremeHeat))
+            .ReturnsAsync(existingAlert);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.TemperatureSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.ExtremeHeat)), Times.Never);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ExtremeHeat_ActiveAlert_TempNowNormal_ResolvesAlert()
+    {
+        // Arrange — existing alert, readings now below threshold
+        var readings = new[]
+        {
+            MakeTemperatureData(_plotId, 25f),
+            MakeTemperatureData(_plotId, 27f),
+            MakeTemperatureData(_plotId, 26f)
+        };
+
+        var existingAlert = new Alert(_plotId, AlertType.ExtremeHeat, "heat alert");
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.ExtremeHeat))
+            .ReturnsAsync(existingAlert);
+
+        _alertRepoMock
+            .Setup(r => r.UpdateAsync(It.IsAny<Alert>()))
+            .ReturnsAsync(true);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.TemperatureSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.UpdateAsync(
+            It.Is<Alert>(a => a.Type == AlertType.ExtremeHeat && !a.IsActive && a.ResolvedAt.HasValue)),
+            Times.Once);
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.ExtremeHeat)), Times.Never);
+    }
+
+    // ── HeavyRainRule tests ───────────────────────────────────────────────────
+
+    private static IoTData MakePrecipitationData(Guid plotId, float precipValue, DateTime? at = null)
+    {
+        var d = new IoTData(
+            plotId,
+            IoTDeviceType.PrecipitationSensor,
+            $"{{\"value\":{precipValue},\"unit\":\"mm\"}}",
+            at ?? DateTime.UtcNow);
+        d.MarkAsQueued("test-queue");
+        d.MarkAsProcessed();
+        return d;
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_TemperatureDevice_SkipsHeavyRainEvaluation()
+    {
+        // Arrange — TemperatureSensor should not trigger HeavyRain rule
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(Enumerable.Empty<IoTData>());
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, It.IsAny<AlertType>()))
+            .ReturnsAsync((Alert?)null);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.TemperatureSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.HeavyRain)), Times.Never);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_HeavyRain_CumulativeAboveThreshold_CreatesAlert()
+    {
+        // Arrange — cumulative precipitation ≥ 50mm
+        var readings = new[]
+        {
+            MakePrecipitationData(_plotId, 20f),
+            MakePrecipitationData(_plotId, 18f),
+            MakePrecipitationData(_plotId, 15f)  // total = 53mm
+        };
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.HeavyRain))
+            .ReturnsAsync((Alert?)null);
+
+        _alertRepoMock
+            .Setup(r => r.AddAsync(It.IsAny<Alert>()))
+            .ReturnsAsync(true);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.PrecipitationSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.AddAsync(
+            It.Is<Alert>(a => a.Type == AlertType.HeavyRain && a.PlotId == _plotId && a.IsActive)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_HeavyRain_CumulativeBelowThreshold_DoesNotCreateAlert()
+    {
+        // Arrange — total < 50mm
+        var readings = new[]
+        {
+            MakePrecipitationData(_plotId, 10f),
+            MakePrecipitationData(_plotId, 15f)   // total = 25mm
+        };
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.HeavyRain))
+            .ReturnsAsync((Alert?)null);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.PrecipitationSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.HeavyRain)), Times.Never);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_HeavyRain_ActiveAlertExists_DoesNotDuplicate()
+    {
+        // Arrange — existing active HeavyRain alert
+        var readings = new[]
+        {
+            MakePrecipitationData(_plotId, 30f),
+            MakePrecipitationData(_plotId, 25f)   // total = 55mm
+        };
+
+        var existingAlert = new Alert(_plotId, AlertType.HeavyRain, "existing rain alert");
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.HeavyRain))
+            .ReturnsAsync(existingAlert);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.PrecipitationSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.HeavyRain)), Times.Never);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_HeavyRain_ActiveAlert_PrecipNowLow_ResolvesAlert()
+    {
+        // Arrange — existing alert, cumulative now below threshold
+        var readings = new[]
+        {
+            MakePrecipitationData(_plotId, 5f),
+            MakePrecipitationData(_plotId, 3f)   // total = 8mm
+        };
+
+        var existingAlert = new Alert(_plotId, AlertType.HeavyRain, "rain alert");
+
+        _iotRepoMock
+            .Setup(r => r.GetByPlotIdAndDateRangeAsync(_plotId, It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(readings);
+
+        _alertRepoMock
+            .Setup(r => r.GetActiveByPlotIdAndTypeAsync(_plotId, AlertType.HeavyRain))
+            .ReturnsAsync(existingAlert);
+
+        _alertRepoMock
+            .Setup(r => r.UpdateAsync(It.IsAny<Alert>()))
+            .ReturnsAsync(true);
+
+        // Act
+        await _sut.EvaluateAsync(_plotId, IoTDeviceType.PrecipitationSensor);
+
+        // Assert
+        _alertRepoMock.Verify(r => r.UpdateAsync(
+            It.Is<Alert>(a => a.Type == AlertType.HeavyRain && !a.IsActive && a.ResolvedAt.HasValue)),
+            Times.Once);
+        _alertRepoMock.Verify(r => r.AddAsync(It.Is<Alert>(a => a.Type == AlertType.HeavyRain)), Times.Never);
     }
 }
 
