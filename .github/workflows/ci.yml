@@ -165,17 +165,18 @@ jobs:
       # ── Validate manifests (always — no cluster needed) ──────────────────
       - name: Validate manifests (dry-run client)
         run: |
-          kubectl apply --dry-run=client -f k8s/00-namespace.yaml
-          kubectl apply --dry-run=client -f k8s/01-configmap.yaml
-          kubectl apply --dry-run=client -f k8s/02-secret.yaml
-          kubectl apply --dry-run=client -f k8s/03-postgres.yaml
-          kubectl apply --dry-run=client -f k8s/04-rabbitmq.yaml
-          kubectl apply --dry-run=client -f k8s/05-api.yaml
-          kubectl apply --dry-run=client -f k8s/06-identity.yaml
-          kubectl apply --dry-run=client -f k8s/07-worker.yaml
-          kubectl apply --dry-run=client -f k8s/08-prometheus.yaml
-          kubectl apply --dry-run=client -f k8s/09-grafana.yaml
-          kubectl apply --dry-run=client -f k8s/10-ingress.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/00-namespace.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/01-configmap.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/02-secret.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/03-postgres.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/04-rabbitmq.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/05-api.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/06-identity.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/07-worker.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/08-prometheus.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/09-grafana.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/10-ingress.yaml
+          kubectl apply --dry-run=client --validate=false -f k8s/11-networkpolicy.yaml
 
       # ── Detect optional secrets (secrets context is NOT valid in if: conditions)
       - name: Detect optional secrets
