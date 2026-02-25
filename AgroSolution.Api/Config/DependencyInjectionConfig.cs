@@ -19,7 +19,7 @@ public static class DependencyInjectionConfig
     public static IServiceCollection ResolveDependencies(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<ManagementDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+            options.UseNpgsql(configuration.GetConnectionString("ManagementConnection")));
 
         // Repositórios
         services.AddScoped<IPropertyRepository, PropertyRepository>();

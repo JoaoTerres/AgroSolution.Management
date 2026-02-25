@@ -8,10 +8,6 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ─── Database ──────────────────────────────────────────────────────────────
-builder.Services.AddDbContext<ManagementDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("ManagementConnection")));
-
 // ─── Authentication / JWT ──────────────────────────────────────────────────
 var jwtSecret   = builder.Configuration["Jwt:SecretKey"]!;
 var jwtIssuer   = builder.Configuration["Jwt:Issuer"]!;
