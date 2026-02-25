@@ -206,33 +206,38 @@ Autenticação: JWT Bearer
 
 ---
 
-## 🚀 Performance Estimada (Benchmark)
+## 🚀 Performance Medida (Benchmark)
 
-> Valores de referência coletados com `.scripts/Invoke-LoadTest.ps1`  
-> Ambiente: docker-compose local, PostgreSQL + RabbitMQ em containers  
-> Configuração: **10 workers concorrentes × 30 segundos**
+> Valores **reais** coletados com `.scripts/Invoke-LoadTest.ps1`  
+> Ambiente: docker-compose local, PostgreSQL + RabbitMQ em containers, Windows 12-core  
+> Configuração: **10 workers concorrentes × 30 segundos** — 3 497 escritas + 3 496 leituras
 
-| Endpoint                        | RPS  | P50 ms | P95 ms | P99 ms | Taxa de Sucesso |
-|---------------------------------|------|--------|--------|--------|-----------------|
-| `POST /api/iot/data` (escrita)  | ~180 | ~45    | ~120   | ~200   | ≥ 99%           |
-| `GET  /api/iot/data` (leitura)  | ~320 | ~25    | ~80    | ~150   | ≥ 99%           |
-| `POST /api/auth/login`          | ~90  | ~80    | ~180   | ~250   | ≥ 99%           |
+| Endpoint                              | RPS    | Min ms | P50 ms | P95 ms | P99 ms | Max ms | Sucesso |
+|---------------------------------------|--------|--------|--------|--------|--------|--------|---------|
+| `POST /api/iot/data` (escrita IoT)    | 106,9  | 3      | 11     | 50     | 82     | 884    | 100%    |
+| `GET  /api/iot/data/{plotId}` (leitura)| 106,9 | 4      | 57     | 130    | 197    | 812    | 100%    |
 
-> **Nota:** Resultados reais variam por hardware. Execute o benchmark localmente para obter valores precisos:
+> Resultados JSON por execução salvos automaticamente em `benchmark/benchmark_<timestamp>.json`.  
+> Para reproduzir:
 > ```powershell
 > .scripts\Invoke-LoadTest.ps1 -DurationSeconds 30 -Concurrency 10
-> # Salva JSON em benchmark/ e exibe snippet Markdown para colar aqui
+> # Exibe tabela e snippet Markdown; salva JSON em benchmark/
 > ```
 
-### Limites de recursos (Kubernetes)
+### Limites de recursos (Kubernetes — servidor low-price 2 vCPU / 2 GB)
 
-| Serviço | CPU request | CPU limit | Mem request | Mem limit | Imagem base          |
-|---------|-------------|-----------|-------------|-----------|----------------------|
-| Api     | 100m        | 500m      | 128 Mi      | 256 Mi    | aspnet:9.0-alpine    |
-| Identity| 100m        | 500m      | 128 Mi      | 256 Mi    | aspnet:9.0-alpine    |
-| Worker  | 50m         | 300m      | 64 Mi       | 128 Mi    | aspnet:9.0-alpine    |
+| Serviço    | CPU req | CPU lim | Mem req | Mem lim | Imagem base       |
+|------------|---------|---------|---------|---------|-------------------|
+| Api        | 75m     | 200m    | 96 Mi   | 192 Mi  | aspnet:9.0-alpine |
+| Identity   | 75m     | 200m    | 96 Mi   | 192 Mi  | aspnet:9.0-alpine |
+| Worker     | 50m     | 150m    | 64 Mi   | 128 Mi  | aspnet:9.0-alpine |
+| PostgreSQL | 100m    | 300m    | 128 Mi  | 256 Mi  | postgres:16-alpine|
+| RabbitMQ   | 100m    | 250m    | 128 Mi  | 240 Mi  | rabbitmq:3.13-mgmt|
+| Prometheus | 50m     | 200m    | 64 Mi   | 192 Mi  | prom/prometheus   |
+| Grafana    | 50m     | 150m    | 64 Mi   | 128 Mi  | grafana/grafana   |
 
-> Imagens Alpine reduzem o tamanho final de **~220 MB → ~100 MB** por serviço.
+> Imagens Alpine reduzem o tamanho final de **~220 MB → ~100 MB** por serviço.  
+> Budget total: 500m CPU req / 640 Mi RAM req — compatível com 2 vCPU / 2 GB com folga para o SO.
 
 ---
 
