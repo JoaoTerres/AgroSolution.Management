@@ -27,6 +27,7 @@ public class IoTDataController(
     /// <response code="400">Validação de dados falhou</response>
     /// <response code="500">Erro interno do servidor</response>
     [HttpPost("data")]
+    [Authorize]
     [Produces("application/json")]
     public async Task<IActionResult> ReceiveData()
     {

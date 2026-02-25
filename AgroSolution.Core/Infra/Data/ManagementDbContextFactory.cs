@@ -14,7 +14,7 @@ public class ManagementDbContextFactory : IDesignTimeDbContextFactory<Management
             .Build();
 
         var optionsBuilder = new DbContextOptionsBuilder<ManagementDbContext>();
-        optionsBuilder.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+        optionsBuilder.UseNpgsql(configuration.GetConnectionString("ManagementConnection"));
 
         return new ManagementDbContext(optionsBuilder.Options);
     }
