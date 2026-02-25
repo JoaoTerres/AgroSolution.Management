@@ -349,10 +349,10 @@ FR-05 Alert Engine            → ✅ COMPLETE
                                    GET /api/alerts/{plotId} with AlertResponseDto
 
 TR-01 Microservices           → ✅ COMPLETE (Identity + Api + Worker as standalone services; Dockerfiles for all 3)
-TR-02 Kubernetes              → ❌ NOT STARTED  ← NEXT PRIORITY
-TR-03 Observability           → ❌ NOT STARTED
+TR-02 Kubernetes              → ✅ COMPLETE (k8s/ directory, 11 manifests, minikube guide)
+TR-03 Observability           → ✅ COMPLETE (/metrics via prometheus-net + Grafana IoT dashboard)
 TR-04 Messaging (RabbitMQ)    → ✅ COMPLETE (docker-compose + topology + Producer + Consumer + AlertEngine hook)
-TR-05 CI/CD                   → ⚠️ PARTIAL (test pipeline green; Docker build/push step missing)
+TR-05 CI/CD                   → ⚠️ PARTIAL (docker build+push to GHCR ✅; kubectl rollout step ❌)
 TR-06 Best Practices          → ⚠️ PARTIAL (arch OK; [Authorize] active; DTO annotation validation missing)
 
 D-01 Architecture Diagram     → ❌ NOT STARTED

@@ -473,7 +473,7 @@ FILE: AgroSolution.Api\Controllers\BaseController.cs
 ```
 ETAPA: 1 → COMPLETE (API receives IoT data, validates, persists)
 ETAPA: 2 → COMPLETE (Workers, Alert Engine, Dashboard endpoint all implemented)
-ETAPA: 3 → IN_PROGRESS (next: Kubernetes manifests → Prometheus/Grafana → CI Docker build)
+ETAPA: 3 → IN_PROGRESS (Kubernetes ✅ / Prometheus+Grafana ✅ / CI Docker build ✅ / k8s deploy CI step ❌)
 
 COMPLETED_SINCE_ETAPA_1:
   AgroSolution.Identity        ✅ (FR-01) — POST /api/auth/register + POST /api/auth/login
@@ -487,18 +487,20 @@ COMPLETED_SINCE_ETAPA_1:
   GET /api/plots/{id}          ✅ — GetByIdPlot use case wired, [Authorize]
   Tests                        ✅ — 46/46 passing (Core.Tests + Api.Tests smoke)
 
-ETAPA_3_COMPONENTS (PENDING):
-  TR-02 → Kubernetes manifests (k8s/ directory: Deployment + Service + ConfigMap + Secret + Ingress per svc)
-  TR-03 → Prometheus /metrics endpoint (prometheus-net NuGet) + Grafana dashboard JSON
-  TR-05 → Docker build + push step in ci.yml + kubectl apply rollout
-  OPTIONAL → Docker image build step already linked to TR-05 evidence
+ETAPA_3_COMPONENTS (IN_PROGRESS → branch feat/kubernetes commit 3fcfe4d):
+  TR-02 ✅ k8s/ directory: namespace, configmap, secret, postgres StatefulSet, rabbitmq Deployment,
+          api/identity/worker Deployments + Services, nginx Ingress, README with minikube guide
+  TR-03 ✅ Prometheus (08-prometheus.yaml: kubernetes_sd + RBAC + ConfigMap)
+         ✅ Grafana    (09-grafana.yaml: datasource + 4-panel IoT dashboard pre-provisioned)
+         ✅ /metrics endpoint on Api (prometheus-net.AspNetCore 8.2.1)
+         ✅ /health   endpoint on Api (AddHealthChecks)
+  TR-05 ✅ ci.yml: docker-build job (push to main → build+push api/identity/worker to GHCR)
 
-ETAPA_3_NEXT_ACTION:
-  1. Open PR feat/iot-adjustments → main (bring ExtremeHeat+HeavyRain to main branch)
-  2. Create branch feat/kubernetes
-  3. Add k8s/ manifests (one Deployment+Service per service; ConfigMap; Secret)
-  4. Add /metrics endpoint to AgroSolution.Api (prometheus-net)
-  5. Add docker build step to ci.yml
+  REMAINING:
+  TR-05 ❌ kubectl apply rollout step (push k8s manifests to running cluster)
+  D-01  ❌ Architecture diagram (Mermaid in docs/01-Arquitetura/)
+  POLISH ❌ DTO validation (DataAnnotations or FluentValidation)
+  POLISH ❌ Replace InMemoryDeviceRepository with DB-backed (IDeviceRepository)
 ```
 
 ---
