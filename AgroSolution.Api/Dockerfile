@@ -16,10 +16,9 @@ COPY AgroSolution.Api/AgroSolution.Api.csproj               AgroSolution.Api/
 RUN dotnet restore AgroSolution.Api/AgroSolution.Api.csproj
 
 # ── Stage 2: Build & Publish ──────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS publish
-WORKDIR /src
+# Extend restore stage so obj/project.assets.json is available for --no-restore
+FROM restore AS publish
 
-COPY --from=restore /root/.nuget /root/.nuget
 # Copy all source files after restore cache is established.
 COPY AgroSolution.Core/ AgroSolution.Core/
 COPY AgroSolution.Api/  AgroSolution.Api/

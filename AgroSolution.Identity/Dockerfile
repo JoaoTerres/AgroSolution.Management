@@ -14,10 +14,9 @@ COPY AgroSolution.Identity/AgroSolution.Identity.csproj                 AgroSolu
 RUN dotnet restore AgroSolution.Identity/AgroSolution.Identity.csproj
 
 # ── Stage 2: Build & Publish ──────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS publish
-WORKDIR /src
+# Extend restore stage so obj/project.assets.json is available for --no-restore
+FROM restore AS publish
 
-COPY --from=restore /root/.nuget /root/.nuget
 COPY AgroSolution.Identity/ AgroSolution.Identity/
 
 RUN dotnet publish AgroSolution.Identity/AgroSolution.Identity.csproj \
