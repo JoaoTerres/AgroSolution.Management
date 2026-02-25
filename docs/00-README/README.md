@@ -1,10 +1,83 @@
-# AgroSolution.Management - Documentação Principal
+# AgroSolution.Management
+
+**Versão:** 2.0 | **Atualizado:** 24/02/2026 | **Status:** Etapa 2 Concluída
 
 ---
-**Versão:** 1.0  
-**Data:** 12/02/2026  
-**Status:** Rascunho
+
+## Objetivo
+
+Plataforma de gestão de propriedades agrícolas com:
+
+- Cadastro de propriedades e talhões (parcelas)
+- Recepção e processamento assíncrono de dados IoT via RabbitMQ
+- Motor de alertas agronômicos automáticos (Seca, CalorExtremo, ChuvaIntensa)
+- Dashboard de histórico de leituras por talhão
+- Autenticação JWT via microserviço `AgroSolution.Identity`
+
 ---
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| API | ASP.NET Core 9.0 / C# |
+| Mensageria | RabbitMQ 3.13 |
+| Banco | PostgreSQL 16 (Docker) |
+| ORM | Entity Framework Core 9 + Npgsql |
+| Auth | JWT HS256 — emitido por AgroSolution.Identity |
+| Worker | .NET Generic Host Worker Service |
+| CI | GitHub Actions |
+
+---
+
+## Quick Start (local)
+
+### Pré-requisitos
+- .NET 9 SDK
+- Docker Desktop
+
+### 1. Subir infra
+```bash
+cp .env.example .env          # ajuste senhas se necessário
+docker compose up -d          # postgres + rabbitmq
+```
+
+### 2. Rodar a API
+```bash
+dotnet run --project AgroSolution.Api
+# Swagger: https://localhost:7xxx/swagger
+```
+
+### 3. Rodar o Worker
+```bash
+dotnet run --project AgroSolution.Worker
+```
+
+### 4. Rodar testes
+```bash
+dotnet test
+```
+
+---
+
+## Projetos na solução
+
+| Projeto | Porta | Descrição |
+|---|---|---|
+| `AgroSolution.Api` | 7xxx/8080 | API REST principal |
+| `AgroSolution.Identity` | 7xxx/8081 | Microserviço de autenticação |
+| `AgroSolution.Worker` | — | Producer + Consumer RabbitMQ |
+| `AgroSolution.Core` | — | Domínio, casos de uso, infra |
+
+---
+
+## Convenções
+
+- Código: C# / inglês
+- Documentação: Português
+- Commits: Conventional Commits (`feat:`, `fix:`, `hotfix:`, `docs:`)
+- Testes: xUnit + NSubstitute
+
 
 ## 🎯 Objetivo do Projeto
 

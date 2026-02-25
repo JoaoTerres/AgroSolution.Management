@@ -1,8 +1,49 @@
 # AgroSolution.Management - Índice de Documentação
 
-**Data de Criação:** 12/02/2026  
-**Versão:** 1.0 - Inicial  
-**Status:** Em Desenvolvimento
+**Atualizado:** 24/02/2026  
+**Versão:** 2.0  
+**Status:** Etapa 2 Concluída
+
+---
+
+## Estrutura da Documentação
+
+| Pasta | Descrição |
+|---|---|
+| **00-README** | Visão geral do projeto e quick start |
+| **01-Arquitetura** | Diagramas e padrões arquiteturais |
+| **02-Especificacoes** | Requisitos funcionais e técnicos |
+| **03-GuiasDesenvolvimento** | Convenções e guias de contribuição |
+| **04-API** | Endpoints, schemas e exemplos |
+| **05-Banco-de-Dados** | Modelos, migrations e scripts |
+| **06-Testes** | Estratégia, cobertura e resultados |
+| **07-Seguranca** | Autenticação JWT, autorização |
+| **08-Deploy** | Docker, CI/CD, ambientes |
+| **09-FAQ** | Troubleshooting e perguntas frequentes |
+
+---
+
+## Status das Entregas
+
+| Feature | Status | Branch/Commit |
+|---|---|---|
+| FR-00 — Property/Plot CRUD | ✅ Concluído | `79701d3` |
+| FR-00 — IoT data ingestion | ✅ Concluído | `79701d3` |
+| FR-01 — Autenticação JWT (Identity) | ✅ Concluído | `fb65638` |
+| FR-04 — Dashboard IoT por talhão | ✅ Concluído | `6d41432` |
+| FR-05 — Motor de Alertas (DroughtRule) | ✅ Concluído | `6d41432` |
+| TR-04 — RabbitMQ + Workers + Docker | ✅ Concluído | `2126e15` |
+| CI/CD — GitHub Actions | ✅ Ativo | `.github/workflows/ci.yml` |
+| TR-02 — Kubernetes manifests | ❌ Não iniciado | — |
+| TR-03 — Observabilidade (Prometheus) | ❌ Não iniciado | — |
+
+---
+
+## Documentos disponíveis
+
+- [README do Projeto](00-README/README.md)
+- [API Endpoints](04-API/IOT-API.md)
+
 
 ---
 
