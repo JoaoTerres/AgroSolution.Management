@@ -1,9 +1,11 @@
-# 📋 Próximas Etapas - Roadmap Etapa 2 & 3
+# 📋 Roadmap Etapas 2 & 3
 
 ---
-**Data:** 12/02/2026  
-**Etapa Atual:** 1 (Concluída)  
-**Próxima Etapa:** 2 (RabbitMQ)
+**Atualizado:** 25/02/2026  
+**Etapa 1:** ✅ Concluída  
+**Etapa 2:** ✅ Concluída (commit `67ebe80` | PR #3 merged 2026-02-25)  
+**Etapa 3:** 🔄 Em andamento — Kubernetes + Observabilidade
+
 ---
 
 ## 🎯 Visão Geral

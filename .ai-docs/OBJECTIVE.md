@@ -201,25 +201,32 @@ Use this ordering when deciding what to build next in any session.
 ```
 PRIORITY_1 (blocks everything else):
   → FR-01: Authentication (JWT) — blocks [Authorize], dashboard ownership, demo flow
+  STATUS: ✅ DONE
 
 PRIORITY_2 (core MVP functionality):
   → TR-04: RabbitMQ messaging (Etapa 2) — required for TR-01 grading and FR-05
-  → FR-05: Alert engine consumer + rule (humidity<30% for 24h)
+  → FR-05: Alert engine consumer + rules
   → Alert entity + repo + migration
+  STATUS: ✅ DONE (Drought + ExtremeHeat + HeavyRain rules, 46 tests)
 
-PRIORITY_3 (demo completeness):
-  → FR-04: Dashboard GET endpoints (backend) — query method already exists in repo
-  → FR-04: Frontend (minimal SPA or Swagger-based demo)
-  → TR-02: Kubernetes manifests (k8s/ directory)
-
-PRIORITY_4 (grading evidence):
-  → TR-03: Prometheus + Grafana setup
+PRIORITY_3 (next — Etapa 3 start):
+  → TR-02: Kubernetes manifests ← NEXT ACTION
+      Create k8s/ directory with Deployment+Service+ConfigMap+Secret+Ingress per service
+      Services: agrosolution-api, agrosolution-identity, agrosolution-worker
+      Infrastructure: postgres, rabbitmq (StatefulSet or external)
+  → TR-03: Prometheus /metrics + Grafana dashboard
+      Add prometheus-net NuGet to AgroSolution.Api
+      Expose /metrics endpoint
+      Add prometheus.yml + Grafana dashboard JSON to docker-compose
   → TR-05: Docker build + k8s deploy step in ci.yml
 
-PRIORITY_5 (polish/bonus):
-  → Input validation on DTOs (FluentValidation or DataAnnotations)
+PRIORITY_4 (grading polish):
+  → D-01: Architecture diagram (Mermaid or draw.io) in docs/01-Arquitetura/
+  → Frontend: minimal SPA or Swagger-based demo for D-04
+  → Input validation on DTOs (DataAnnotations or FluentValidation)
+
+PRIORITY_5 (bonus):
   → Replace InMemoryDeviceRepository with DB-backed
-  → [Authorize] on all controllers
   → OPT-03: Weather API integration
 ```
 
@@ -328,17 +335,21 @@ OBJ_RULE_09: humidity < 30% threshold is the ONLY alert rule required for passin
 
 ## §10 STATUS_SNAPSHOT
 
-Current state of the project mapped to deliverables (as of 2026-02-23):
+Current state of the project mapped to deliverables (as of 2026-02-25):
 
 ```
 FR-01 Authentication          → ✅ COMPLETE (AgroSolution.Identity — POST /api/auth/register + /login, JWT HS256)
-FR-02 Property/Plot CRUD      → ✅ COMPLETE
+FR-02 Property/Plot CRUD      → ✅ COMPLETE (includes GET /api/plots/{id})
 FR-03 IoT Ingestion API       → ✅ COMPLETE (InMemoryDevice is acceptable for demo)
 FR-04 Dashboard               → ✅ COMPLETE (GET /api/iot/data/{plotId}?from=&to=, 90-day guard, [Authorize])
-FR-05 Alert Engine            → ✅ COMPLETE (DroughtAlertRule: humidity<30% for 24h, GET /api/alerts/{plotId})
+FR-05 Alert Engine            → ✅ COMPLETE
+                                   DroughtRule:     humidity<30% for 24h (min 2 readings)
+                                   ExtremeHeatRule: temp>38°C all readings in 6h (min 3 readings)
+                                   HeavyRainRule:   cumulative precip≥50mm in 6h
+                                   GET /api/alerts/{plotId} with AlertResponseDto
 
 TR-01 Microservices           → ✅ COMPLETE (Identity + Api + Worker as standalone services; Dockerfiles for all 3)
-TR-02 Kubernetes              → ❌ NOT STARTED
+TR-02 Kubernetes              → ❌ NOT STARTED  ← NEXT PRIORITY
 TR-03 Observability           → ❌ NOT STARTED
 TR-04 Messaging (RabbitMQ)    → ✅ COMPLETE (docker-compose + topology + Producer + Consumer + AlertEngine hook)
 TR-05 CI/CD                   → ⚠️ PARTIAL (test pipeline green; Docker build/push step missing)
@@ -347,7 +358,13 @@ TR-06 Best Practices          → ⚠️ PARTIAL (arch OK; [Authorize] active; D
 D-01 Architecture Diagram     → ❌ NOT STARTED
 D-02 Infrastructure Demo      → ⚠️ PARTIAL (docker-compose up -d starts all infra ✅; app containers via override ✅)
 D-03 CI/CD Demo               → ⚠️ PARTIAL
-D-04 MVP Demo                 → ✅ UNBLOCKED (all 8 demo steps now implementable)
+D-04 MVP Demo                 → ✅ UNBLOCKED (all 8 demo steps implementable; 46/46 tests passing)
+
+TEST_BASELINE (2026-02-25):
+  AgroSolution.Core.Tests: 46 passing (ReceiveIoTData: 19, AlertEngine: 15, GetAlerts: 4, GetIoTDataByRange: 6,
+                                        GetByIdPlot: 2)
+  AgroSolution.Api.Tests:  smoke only, no threshold
+  Coverage: ≥55% scoped to ReceiveIoTData + Validation namespaces
 ```
 
 ### Infrastructure additions (2026-02-24 — Phase 4)

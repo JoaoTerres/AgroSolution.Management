@@ -1,8 +1,8 @@
 # AgroSolution.Management - Índice de Documentação
 
-**Atualizado:** 24/02/2026  
-**Versão:** 2.0  
-**Status:** Etapa 2 Concluída
+**Atualizado:** 25/02/2026  
+**Versão:** 2.1  
+**Status:** Etapa 2 Concluída | Etapa 3 Iniciando
 
 ---
 
@@ -32,6 +32,8 @@
 | FR-01 — Autenticação JWT (Identity) | ✅ Concluído | `fb65638` |
 | FR-04 — Dashboard IoT por talhão | ✅ Concluído | `6d41432` |
 | FR-05 — Motor de Alertas (DroughtRule) | ✅ Concluído | `6d41432` |
+| FR-05 — Motor de Alertas (ExtremeHeat + HeavyRain) | ✅ Concluído | `67ebe80` |
+| GET /api/plots/{id} | ✅ Concluído | `1318a16` |
 | TR-04 — RabbitMQ + Workers + Docker | ✅ Concluído | `2126e15` |
 | CI/CD — GitHub Actions | ✅ Ativo | `.github/workflows/ci.yml` |
 | TR-02 — Kubernetes manifests | ❌ Não iniciado | — |

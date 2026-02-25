@@ -473,27 +473,32 @@ FILE: AgroSolution.Api\Controllers\BaseController.cs
 ```
 ETAPA: 1 → COMPLETE (API receives IoT data, validates, persists)
 ETAPA: 2 → COMPLETE (Workers, Alert Engine, Dashboard endpoint all implemented)
-ETAPA: 3 → PENDING  (Kubernetes, Prometheus/Grafana)
+ETAPA: 3 → IN_PROGRESS (next: Kubernetes manifests → Prometheus/Grafana → CI Docker build)
 
 COMPLETED_SINCE_ETAPA_1:
-  AgroSolution.Identity    ✅ (FR-01) — POST /api/auth/register + POST /api/auth/login
-  docker-compose.yml       ✅ — PostgreSQL + pgAdmin + RabbitMQ isolated, topology pre-loaded
-  AgroSolution.Worker      ✅ (TR-04) — IoTDataProducerWorker + IoTDataConsumerWorker
-  Dockerfiles              ✅ — Api, Identity, Worker (multi-stage, non-root user agro)
-  Alert Engine             ✅ (FR-05) — DroughtAlertRule, GET /api/alerts/{plotId}
-  Dashboard endpoint       ✅ (FR-04) — GET /api/iot/data/{plotId}?from=&to=
+  AgroSolution.Identity        ✅ (FR-01) — POST /api/auth/register + POST /api/auth/login
+  docker-compose.yml           ✅ — PostgreSQL + pgAdmin + RabbitMQ isolated, topology pre-loaded
+  AgroSolution.Worker          ✅ (TR-04) — IoTDataProducerWorker + IoTDataConsumerWorker
+  Dockerfiles                  ✅ — Api, Identity, Worker (multi-stage, non-root user agro)
+  Alert Engine — DroughtRule   ✅ (FR-05) — humidity<30% for 24h, GET /api/alerts/{plotId}
+  Alert Engine — ExtremeHeat   ✅ (FR-05+) — temp>38°C all readings in 6h, min 3 readings
+  Alert Engine — HeavyRain     ✅ (FR-05+) — cumulative precip≥50mm in 6h
+  Dashboard endpoint           ✅ (FR-04) — GET /api/iot/data/{plotId}?from=&to=
+  GET /api/plots/{id}          ✅ — GetByIdPlot use case wired, [Authorize]
+  Tests                        ✅ — 46/46 passing (Core.Tests + Api.Tests smoke)
 
-ETAPA_3_COMPONENTS:
-  Kubernetes manifests (k8s/ or helm/)
-  Prometheus metrics endpoint (AspNetCore.Diagnostics.HealthChecks or custom middleware)
-  Grafana dashboards
-  InfluxDB or TimescaleDB for time-series (replaces/augments ManagementDbContext for IoTData)
+ETAPA_3_COMPONENTS (PENDING):
+  TR-02 → Kubernetes manifests (k8s/ directory: Deployment + Service + ConfigMap + Secret + Ingress per svc)
+  TR-03 → Prometheus /metrics endpoint (prometheus-net NuGet) + Grafana dashboard JSON
+  TR-05 → Docker build + push step in ci.yml + kubectl apply rollout
+  OPTIONAL → Docker image build step already linked to TR-05 evidence
 
-ETAPA_3_COMPONENTS:
-  Kubernetes manifests (k8s/ or helm/)
-  Prometheus metrics endpoint (AspNetCore.Diagnostics.HealthChecks or custom middleware)
-  Grafana dashboards
-  InfluxDB or TimescaleDB for time-series (replaces/augments ManagementDbContext for IoTData)
+ETAPA_3_NEXT_ACTION:
+  1. Open PR feat/iot-adjustments → main (bring ExtremeHeat+HeavyRain to main branch)
+  2. Create branch feat/kubernetes
+  3. Add k8s/ manifests (one Deployment+Service per service; ConfigMap; Secret)
+  4. Add /metrics endpoint to AgroSolution.Api (prometheus-net)
+  5. Add docker build step to ci.yml
 ```
 
 ---
