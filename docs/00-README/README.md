@@ -1,6 +1,6 @@
 # AgroSolution.Management
 
-**Versão:** 3.0 | **Atualizado:** 25/02/2026 | **Status:** Etapa 3 — Kubernetes + CI/CD
+**Versão:** 3.1 | **Atualizado:** 25/02/2026 | **Status:** Etapa 3 — Kubernetes + CI/CD
 
 ---
 
@@ -33,49 +33,124 @@ Plataforma de gestão de propriedades agrícolas com:
 
 ---
 
-## Quick Start (local)
+## Executar localmente (setup completo em 1 comando)
+
+### Pré-requisitos
+
+| Ferramenta | Versão mínima | Download |
+|---|---|---|
+| .NET SDK | 9.0 | https://dot.net/download |
+| Docker Desktop | 4.x | https://docker.com |
+| PowerShell | 5.1 (Windows) / 7+ (Mac/Linux) | incluso no Windows |
+
+> **Docker Desktop** deve estar instalado; o script o inicia automaticamente se necessário.
+
+### 1 comando — execução completa
+
+```powershell
+# 1. Clone o repositório
+git clone https://github.com/JoaoTerres/AgroSolution.Management.git
+cd AgroSolution.Management
+
+# 2. Autorize scripts e execute o start
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+.\.scripts\Start-Local.ps1
+```
+
+O script realiza automaticamente:
+
+| Etapa | O que faz |
+|---|---|
+| ✔ Pré-requisitos | Verifica .NET 9 SDK e Docker instalados |
+| ✔ `.env` | Cria `.env` a partir de `.env.example` (na primeira execução) |
+| ✔ Docker Desktop | Inicia o daemon se não estiver rodando |
+| ✔ Infra | `docker compose up -d postgres rabbitmq` + aguarda healthcheck |
+| ✔ Migrations | `dotnet ef database update` para Management e Identity |
+| ✔ Build | `dotnet build` da solução completa |
+| ✔ Serviços | Abre janelas separadas com Identity (5001), Api (5034) e Worker |
+| ✔ Health wait | Aguarda `/health` retornar 200 em ambas as APIs |
+| ✔ Smoke test | Valida o fluxo completo D-04 (11 passos) |
+| ✔ Sumário | Exibe todas as URLs e comandos úteis |
+
+### Opções do script
+
+```powershell
+# Reiniciar sem rebuild (código não mudou)
+.\.scripts\Start-Local.ps1 -SkipBuild
+
+# Subir apenas os serviços sem smoke test
+.\.scripts\Start-Local.ps1 -SkipSmokeTest
+
+# Combinados
+.\.scripts\Start-Local.ps1 -SkipBuild -SkipSmokeTest
+```
+
+### URLs após o start
+
+| Serviço | URL |
+|---|---|
+| API REST | http://localhost:5034 |
+| API Swagger | http://localhost:5034/swagger |
+| Identity | http://localhost:5001 |
+| Identity Swagger | http://localhost:5001/swagger |
+| Métricas Prometheus | http://localhost:5034/metrics |
+| RabbitMQ Management | http://localhost:15672 (agro / agro123) |
+| pgAdmin | http://localhost:54320 (admin@agrosolution.local / admin123) |
+
+### Parar o ambiente
+
+```powershell
+# Para os containers Docker
+docker compose down
+
+# Para os processos .NET
+Get-Process dotnet | Stop-Process -Force
+```
+
+---
+
+## Quick Start (local) — passo a passo manual
+
+Prefere executar etapa por etapa? Siga o guia abaixo.
 
 ### Pré-requisitos
 - .NET 9 SDK
-- Docker Desktop
+- Docker Desktop em execução
 
-### 1. Subir infra
-```bash
+### 1. Infra (postgres + rabbitmq)
+```powershell
 cp .env.example .env          # ajuste senhas se necessário
-docker compose up -d          # postgres + rabbitmq
+docker compose up -d postgres rabbitmq
 ```
 
-### 2. Rodar a API
-```bash
-dotnet run --project AgroSolution.Api
-# Swagger: https://localhost:7xxx/swagger
+### 2. Migrations
+```powershell
+cd AgroSolution.Api;      dotnet ef database update; cd ..
+cd AgroSolution.Identity; dotnet ef database update; cd ..
 ```
 
-### 3. Rodar o Worker
-```bash
-dotnet run --project AgroSolution.Worker
+### 3. Iniciar serviços
+```powershell
+# Em terminais separados:
+cd AgroSolution.Identity; dotnet run --urls http://localhost:5001
+cd AgroSolution.Api;      dotnet run --urls http://localhost:5034
+cd AgroSolution.Worker;   dotnet run
 ```
 
-### 4. Rodar testes
-```bash
+### 4. Testes unitários
+```powershell
 dotnet test
 ```
 
-### 5. Smoke test (valida fluxo D-04 completo)
+### 5. Smoke test (D-04 — 11 passos)
 ```powershell
-.scripts\Invoke-SmokeTest.ps1
-# Kubernetes:
-.scripts\Invoke-SmokeTest.ps1 -ApiUrl http://localhost:30080 -IdentityUrl http://localhost:30081
+.\.scripts\Invoke-SmokeTest.ps1
+# Kubernetes: .\.scripts\Invoke-SmokeTest.ps1 -ApiUrl http://localhost:30080 -IdentityUrl http://localhost:30081
 ```
 
 ### 6. Benchmark de carga
 ```powershell
-# Rápido (10 s, 5 workers)
-.scripts\Invoke-LoadTest.ps1 -DurationSeconds 10 -Concurrency 5
-
-# Completo (60 s, 20 workers)
-.scripts\Invoke-LoadTest.ps1 -DurationSeconds 60 -Concurrency 20
-
+.\.scripts\Invoke-LoadTest.ps1 -DurationSeconds 30 -Concurrency 10
 # Salva resultados em benchmark/benchmark_<timestamp>.json
 ```
 
@@ -85,10 +160,11 @@ dotnet test
 
 | Projeto | Porta | Descrição |
 |---|---|---|
-| `AgroSolution.Api` | 7xxx/8080 | API REST principal |
-| `AgroSolution.Identity` | 7xxx/8081 | Microserviço de autenticação |
+| `AgroSolution.Api` | 5034 | API REST principal |
+| `AgroSolution.Identity` | 5001 | Microserviço de autenticação JWT |
 | `AgroSolution.Worker` | — | Producer + Consumer RabbitMQ |
 | `AgroSolution.Core` | — | Domínio, casos de uso, infra |
+| `AgroSolution.Core.Tests` | — | Testes unitários (46 casos) |
 
 ---
 
@@ -99,146 +175,81 @@ dotnet test
 - Commits: Conventional Commits (`feat:`, `fix:`, `hotfix:`, `docs:`)
 - Testes: xUnit + NSubstitute
 
-
-## 🎯 Objetivo do Projeto
-
-**AgroSolution.Management** é uma plataforma de gestão de propriedades agrícolas e seus talhões (parcelas), fornecendo:
-
-- 📍 Cadastro e gestão de propriedades
-- 📊 Organização de talhões por propriedade
-- 🔐 Controle de acesso por produtor
-- 📈 Base para futuras funcionalidades analíticas
-
 ---
 
-## ⚡ Quick Start
+## Status do Projeto
 
-### Pré-requisitos
-- .NET 9.0
-- PostgreSQL 14+
-- Git
-
-### Setup Local
-```bash
-# Clone o repositório
-git clone <repo-url>
-cd AgroSolution.Management
-
-# Restaure dependências
-dotnet restore
-
-# Configure o banco de dados
-# (Ver docs/05-Banco-de-Dados)
-
-# Execute a API
-dotnet run --project AgroSolution.Api
-```
-
----
-
-## 📚 Índice Rápido
-
-| Seção | Descrição | Link |
-|-------|-----------|------|
-| Arquitetura | Estrutura e padrões | [01-Arquitetura](../01-Arquitetura) |
-| Especificações | Requisitos e funcionalidades | [02-Especificacoes](../02-Especificacoes) |
-| Desenvolvimento | Guias e convenções | [03-GuiasDesenvolvimento](../03-GuiasDesenvolvimento) |
-| API | Endpoints e schemas | [04-API](../04-API) |
-| Banco de Dados | Modelos e migrações | [05-Banco-de-Dados](../05-Banco-de-Dados) |
-| Testes | Estratégia e cobertura | [06-Testes](../06-Testes) |
-| Segurança | Autenticação e autorização | [07-Seguranca](../07-Seguranca) |
-| Deploy | Ambientes e CI/CD | [08-Deploy](../08-Deploy) |
-| FAQ | Dúvidas frequentes | [09-FAQ](../09-FAQ) |
-
----
-
-## 🏗️ Stack Tecnológico
-
-```
-Frontend:     (Não iniciado)
-API:          ASP.NET Core 9.0 / C#
-Banco:        PostgreSQL 14+
-ORM:          Entity Framework Core 9.0
-Autenticação: JWT Bearer
-```
-
----
-
-## 📋 Status do Projeto
-
-### ✅ Completo (Etapa 1 + 2 + 3)
+### Completo (Etapa 1 + 2 + 3)
 - FR-01 Autenticação JWT (AgroSolution.Identity)
 - FR-02 CRUD de Propriedades e Talhões
 - FR-03 Ingestão de dados IoT via API
-- FR-04 Dashboard de histórico (GET /api/iot/data/{plotId})
+- FR-04 Dashboard de histórico (`GET /api/iot/data/{plotId}`)
 - FR-05 Motor de alertas (Seca, CalorExtremo, ChuvaIntensa)
 - TR-01 Microserviços (Api + Identity + Worker)
-- TR-02 Kubernetes — 11 manifests em `k8s/`
-- TR-03 Observabilidade — Prometheus + Grafana
-- TR-04 Mensageria RabbitMQ (Producer + Consumer)
-- TR-05 CI/CD — build → test → Docker GHCR → kubectl apply
+- TR-02 Kubernetes — 12 manifests em `k8s/` (incl. NetworkPolicy)
+- TR-03 Observabilidade — Prometheus (`/metrics`) + Grafana
+- TR-04 Mensageria RabbitMQ (Producer + Consumer + DLQ)
+- TR-05 CI/CD — GitHub Actions: build → test → Docker GHCR → kubectl apply
 - 46 testes unitários passando
+- Smoke test 11/11 validado
 
-### ⚠️ Em Progresso
+### Em Progresso
 - DataAnnotations / FluentValidation nos DTOs de input
 - Diagrama de arquitetura (D-01)
 
-### ❌ Não Iniciado
+### Não Iniciado
 - Frontend SPA
 - OPT-03: Integração com API climática
 
 ---
 
-## 🤝 Convenções
+## Indice de documentacao
 
-- **Linguagem de código:** C#
-- **Linguagem de documentação:** Português
-- **Formato:** Markdown
-- **Versionamento:** Semântico
+| Secao | Link |
+|---|---|
+| Arquitetura | [01-Arquitetura](../01-Arquitetura) |
+| Especificacoes | [02-Especificacoes](../02-Especificacoes) |
+| Guias de Desenvolvimento | [03-GuiasDesenvolvimento](../03-GuiasDesenvolvimento) |
+| API Reference | [04-API](../04-API) |
+| Banco de Dados | [05-Banco-de-Dados](../05-Banco-de-Dados) |
+| Testes | [06-Testes](../06-Testes) |
+| Seguranca | [07-Seguranca](../07-Seguranca) |
+| Deploy / CI-CD | [08-Deploy](../08-Deploy) |
+| FAQ | [09-FAQ](../09-FAQ) |
 
 ---
 
-## 📞 Referências Úteis
-
-- [Documentação .NET 9.0](https://learn.microsoft.com/dotnet)
-- [Entity Framework Core](https://learn.microsoft.com/ef)
-- [ASP.NET Core Security](https://learn.microsoft.com/aspnet/core/security)
-
----
-
-## 🚀 Performance Medida (Benchmark)
+## Performance Medida (Benchmark)
 
 > Valores **reais** coletados com `.scripts/Invoke-LoadTest.ps1`  
 > Ambiente: docker-compose local, PostgreSQL + RabbitMQ em containers, Windows 12-core  
-> Configuração: **10 workers concorrentes × 30 segundos** — 3 497 escritas + 3 496 leituras
+> Configuracao: **10 workers concorrentes x 30 segundos** — 3.497 escritas + 3.496 leituras
 
-| Endpoint                              | RPS    | Min ms | P50 ms | P95 ms | P99 ms | Max ms | Sucesso |
-|---------------------------------------|--------|--------|--------|--------|--------|--------|---------|
-| `POST /api/iot/data` (escrita IoT)    | 106,9  | 3      | 11     | 50     | 82     | 884    | 100%    |
-| `GET  /api/iot/data/{plotId}` (leitura)| 106,9 | 4      | 57     | 130    | 197    | 812    | 100%    |
+| Endpoint | RPS | Min ms | P50 ms | P95 ms | P99 ms | Sucesso |
+|---|---|---|---|---|---|---|
+| `POST /api/iot/data` (escrita IoT) | 106,9 | 3 | 11 | 50 | 82 | 100% |
+| `GET /api/iot/data/{plotId}` (leitura) | 106,9 | 4 | 57 | 130 | 197 | 100% |
 
-> Resultados JSON por execução salvos automaticamente em `benchmark/benchmark_<timestamp>.json`.  
-> Para reproduzir:
-> ```powershell
-> .scripts\Invoke-LoadTest.ps1 -DurationSeconds 30 -Concurrency 10
-> # Exibe tabela e snippet Markdown; salva JSON em benchmark/
-> ```
+```powershell
+# Reproduzir o benchmark:
+.\.scripts\Invoke-LoadTest.ps1 -DurationSeconds 30 -Concurrency 10
+```
 
-### Limites de recursos (Kubernetes — servidor low-price 2 vCPU / 2 GB)
+## Limites de recursos (Kubernetes — servidor low-price 2 vCPU / 2 GB)
 
-| Serviço    | CPU req | CPU lim | Mem req | Mem lim | Imagem base       |
-|------------|---------|---------|---------|---------|-------------------|
-| Api        | 75m     | 200m    | 96 Mi   | 192 Mi  | aspnet:9.0-alpine |
-| Identity   | 75m     | 200m    | 96 Mi   | 192 Mi  | aspnet:9.0-alpine |
-| Worker     | 50m     | 150m    | 64 Mi   | 128 Mi  | aspnet:9.0-alpine |
-| PostgreSQL | 100m    | 300m    | 128 Mi  | 256 Mi  | postgres:16-alpine|
-| RabbitMQ   | 100m    | 250m    | 128 Mi  | 240 Mi  | rabbitmq:3.13-mgmt|
-| Prometheus | 50m     | 200m    | 64 Mi   | 192 Mi  | prom/prometheus   |
-| Grafana    | 50m     | 150m    | 64 Mi   | 128 Mi  | grafana/grafana   |
+| Servico | CPU req | CPU lim | Mem req | Mem lim | Imagem base |
+|---|---|---|---|---|---|
+| Api | 75m | 200m | 96 Mi | 192 Mi | aspnet:9.0-alpine |
+| Identity | 75m | 200m | 96 Mi | 192 Mi | aspnet:9.0-alpine |
+| Worker | 50m | 150m | 64 Mi | 128 Mi | aspnet:9.0-alpine |
+| PostgreSQL | 100m | 300m | 128 Mi | 256 Mi | postgres:16-alpine |
+| RabbitMQ | 100m | 250m | 128 Mi | 240 Mi | rabbitmq:3.13-mgmt |
+| Prometheus | 50m | 200m | 64 Mi | 192 Mi | prom/prometheus |
+| Grafana | 50m | 150m | 64 Mi | 128 Mi | grafana/grafana |
 
-> Imagens Alpine reduzem o tamanho final de **~220 MB → ~100 MB** por serviço.  
-> Budget total: 500m CPU req / 640 Mi RAM req — compatível com 2 vCPU / 2 GB com folga para o SO.
+> Imagens Alpine reduzem o tamanho de **~220 MB para ~100 MB** por servico.  
+> Budget total: 500m CPU req / 640 Mi RAM req — compativel com 2 vCPU / 2 GB.
 
 ---
 
-**Próximo passo:** Leia [Arquitetura](../01-Arquitetura) para entender a estrutura do projeto.
+**Proximo passo:** Leia [Arquitetura](../01-Arquitetura) para entender a estrutura do projeto.
