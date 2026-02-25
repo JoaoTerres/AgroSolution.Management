@@ -127,12 +127,12 @@ if (-not $PlotId) {
     $prop = Invoke-JsonPost -Uri "$ApiUrl/api/properties" `
         -Headers $authHeader `
         -Body @{ name = "BenchFarm_$(Get-Random -Maximum 9999)"; location = "MT, Brasil" }
-    $propertyId = $prop.id ?? $prop.data.id
+    $propertyId = if ($prop.id) { $prop.id } elseif ($prop.data) { $prop.data.id } else { $null }
 
     $plot = Invoke-JsonPost -Uri "$ApiUrl/api/properties/$propertyId/plots" `
         -Headers $authHeader `
         -Body @{ name = "Talhão Bench"; cropType = "Milho"; area = 5.0 }
-    $PlotId = $plot.id ?? $plot.data.id
+    $PlotId = if ($plot.id) { $plot.id } elseif ($plot.data) { $plot.data.id } else { $null }
     Write-Host "           PlotId: $PlotId" -ForegroundColor DarkGray
 }
 
@@ -164,7 +164,7 @@ $scriptBlock = {
     $writeUri = "$ApiUrl/api/iot/data"
     $from     = [DateTime]::UtcNow.AddDays(-1).ToString("yyyy-MM-dd")
     $to       = [DateTime]::UtcNow.AddDays(1).ToString("yyyy-MM-dd")
-    $readUri  = "$ApiUrl/api/iot/data/$PlotId`?from=$from&to=$to"
+    $readUri  = ("$ApiUrl/api/iot/data/$PlotId" + "?from=$from" + "&to=$to")
     $iter     = 0
 
     while ([DateTime]::UtcNow -lt $Deadline) {

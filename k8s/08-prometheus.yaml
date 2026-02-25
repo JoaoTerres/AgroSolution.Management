@@ -79,12 +79,13 @@ spec:
             - name: storage
               mountPath: /prometheus
           resources:
+            # Low-price server profile (7d TSDB retention on emptyDir)
             requests:
-              cpu: "100m"
-              memory: "256Mi"
+              cpu: "50m"
+              memory: "64Mi"
             limits:
-              cpu: "500m"
-              memory: "512Mi"
+              cpu: "200m"
+              memory: "192Mi"
       volumes:
         - name: config
           configMap:

@@ -1,0 +1,190 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NetworkPolicy — AgroSolution pod-to-pod communication rules
+#
+# Topology (allow-list model):
+#
+#  [ingress-nginx] ──► agrosolution-api      (port 8080)
+#  [ingress-nginx] ──► agrosolution-identity (port 8081)
+#
+#  agrosolution-api      ──► agrosolution-postgres  (5432)
+#  agrosolution-api      ──► agrosolution-rabbitmq  (5672)
+#  agrosolution-identity ──► agrosolution-postgres  (5432)
+#  agrosolution-worker   ──► agrosolution-postgres  (5432)
+#  agrosolution-worker   ──► agrosolution-rabbitmq  (5672)
+#
+#  prometheus            ──► agrosolution-api        (8080 /metrics)
+#  grafana               ──► prometheus              (9090)
+#
+#  ALL other pod-to-pod traffic: DENIED
+#
+# Default-deny is set in the first policy of each group.
+# Apply: kubectl apply -f k8s/11-networkpolicy.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 1. Default-deny all ingress in the namespace ─────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: agrosolution
+spec:
+  podSelector: {}          # matches ALL pods in namespace
+  policyTypes:
+    - Ingress
+
+---
+# ── 2. API: accept traffic from nginx-ingress + prometheus scraping ───────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-ingress
+  namespace: agrosolution
+spec:
+  podSelector:
+    matchLabels:
+      app: agrosolution-api
+  policyTypes:
+    - Ingress
+  ingress:
+    # Nginx IngressController (namespace: ingress-nginx)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Prometheus scraping /metrics
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# ── 3. Identity: accept traffic from nginx-ingress only ──────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-identity-ingress
+  namespace: agrosolution
+spec:
+  podSelector:
+    matchLabels:
+      app: agrosolution-identity
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8081
+
+---
+# ── 4. Postgres: accept connections from api, identity, worker only ──────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-ingress
+  namespace: agrosolution
+spec:
+  podSelector:
+    matchLabels:
+      app: agrosolution-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: agrosolution-api
+        - podSelector:
+            matchLabels:
+              app: agrosolution-identity
+        - podSelector:
+            matchLabels:
+              app: agrosolution-worker
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# ── 5. RabbitMQ: accept AMQP from api + worker; management UI from prometheus namespace ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq-ingress
+  namespace: agrosolution
+spec:
+  podSelector:
+    matchLabels:
+      app: agrosolution-rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    # AMQP protocol (producer + consumer)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: agrosolution-api
+        - podSelector:
+            matchLabels:
+              app: agrosolution-worker
+      ports:
+        - protocol: TCP
+          port: 5672
+    # Management UI (15672) accessible from same namespace only (optional: restrict further)
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 15672
+
+---
+# ── 6. Prometheus: accept traffic from Grafana only ──────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress
+  namespace: agrosolution
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+
+---
+# ── 7. Grafana: accept traffic from nginx-ingress (UI) ───────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-ingress
+  namespace: agrosolution
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000

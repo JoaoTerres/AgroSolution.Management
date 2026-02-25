@@ -49,12 +49,13 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 20
           resources:
+            # Low-price server profile (2 vCPU / 2 GB — DO $12, t3.small, e2-small)
             requests:
-              cpu: "100m"
-              memory: "128Mi"
+              cpu: "75m"
+              memory: "96Mi"
             limits:
-              cpu: "500m"
-              memory: "256Mi"
+              cpu: "200m"
+              memory: "192Mi"
 
 ---
 apiVersion: v1

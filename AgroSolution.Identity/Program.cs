@@ -36,6 +36,9 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// ─── Health checks ─────────────────────────────────────────────────────────
+builder.Services.AddHealthChecks();
+
 // ─── MVC / Swagger / DI ────────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddSwaggerConfiguration();
@@ -53,6 +56,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 // ─── Auto-migrate on startup (dev only) ───────────────────────────────────
 if (app.Environment.IsDevelopment())

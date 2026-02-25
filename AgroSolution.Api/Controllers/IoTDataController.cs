@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using AgroSolution.Core.App.DTO;
 using AgroSolution.Core.App.Features.GetIoTDataByRange;
 using AgroSolution.Core.App.Features.ReceiveIoTData;
@@ -35,27 +36,57 @@ public class IoTDataController(
         using var reader = new StreamReader(Request.Body);
         var rawBody = await reader.ReadToEndAsync();
 
-        // Tentar obter tipo do header `X-Device-Type` (int), caso contrário inferir
+        // Parse JSON body to extract well-known fields without discarding rawBody
+        Guid?   plotIdFromBody     = null;
+        string? deviceIdFromBody   = null;
+        IoTDeviceType? deviceTypeFromBody = null;
+
+        try
+        {
+            using var doc  = JsonDocument.Parse(rawBody);
+            var root = doc.RootElement;
+
+            // plotId
+            if (root.TryGetProperty("plotId", out var pId) && pId.ValueKind == JsonValueKind.String
+                && Guid.TryParse(pId.GetString(), out var parsedPlot))
+                plotIdFromBody = parsedPlot;
+
+            // device_id / deviceId
+            if (root.TryGetProperty("device_id", out var dId) && dId.ValueKind == JsonValueKind.String)
+                deviceIdFromBody = dId.GetString();
+            else if (root.TryGetProperty("deviceId", out var dId2) && dId2.ValueKind == JsonValueKind.String)
+                deviceIdFromBody = dId2.GetString();
+
+            // deviceType from JSON body (int or string name)
+            if (root.TryGetProperty("deviceType", out var dtProp))
+            {
+                if (dtProp.ValueKind == JsonValueKind.Number && Enum.IsDefined(typeof(IoTDeviceType), dtProp.GetInt32()))
+                    deviceTypeFromBody = (IoTDeviceType)dtProp.GetInt32();
+                else if (dtProp.ValueKind == JsonValueKind.String
+                         && Enum.TryParse<IoTDeviceType>(dtProp.GetString(), ignoreCase: true, out var parsedEnum))
+                    deviceTypeFromBody = parsedEnum;
+            }
+        }
+        catch { /* malformed JSON — will be caught by use-case validator */ }
+
+        // Determine device type: header > body > inference
         var deviceTypeHeader = Request.Headers["X-Device-Type"].FirstOrDefault();
         IoTDeviceType deviceType;
         if (!string.IsNullOrWhiteSpace(deviceTypeHeader) && int.TryParse(deviceTypeHeader, out var dt))
-        {
             deviceType = (IoTDeviceType)dt;
-        }
+        else if (deviceTypeFromBody.HasValue)
+            deviceType = deviceTypeFromBody.Value;
+        else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.Contains("\"telemetry\"", StringComparison.OrdinalIgnoreCase))
+            deviceType = IoTDeviceType.WeatherStationNode;
         else
-        {
-            // Inferir simples: se contém 'telemetry' -> WeatherStationNode
-            if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.Contains("\"telemetry\"", StringComparison.OrdinalIgnoreCase))
-                deviceType = IoTDeviceType.WeatherStationNode;
-            else
-                deviceType = IoTDeviceType.TemperatureSensor; // fallback mínimo
-        }
+            deviceType = IoTDeviceType.TemperatureSensor; // fallback mínimo
 
-        // Montar DTO: RawData deve conter o JSON completo
         var dto = new ReceiveIoTDataDto
         {
+            PlotId     = plotIdFromBody,
+            DeviceId   = deviceIdFromBody,
             DeviceType = deviceType,
-            RawData = rawBody
+            RawData    = rawBody
         };
 
         var result = await receiveIoTData.ExecuteAsync(dto);
@@ -90,7 +121,10 @@ public class IoTDataController(
         [FromQuery] DateTime from,
         [FromQuery] DateTime to)
     {
-        var result = await getIoTDataByRange.ExecuteAsync(plotId, from, to);
+        // Npgsql 6+ requires DateTimeKind.Utc for timestamptz columns
+        var fromUtc = DateTime.SpecifyKind(from, DateTimeKind.Utc);
+        var toUtc   = DateTime.SpecifyKind(to,   DateTimeKind.Utc);
+        var result = await getIoTDataByRange.ExecuteAsync(plotId, fromUtc, toUtc);
         return CustomResponse(result);
     }
 }
