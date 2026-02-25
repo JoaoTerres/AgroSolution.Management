@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, '**/feat/**', 'feat/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore AgroSolution.Management.sln
+
+      - name: Build
+        run: dotnet build AgroSolution.Management.sln --configuration Release --no-restore
+
+      - name: Test - Core (coverage + threshold)
+        run: |
+          mkdir -p coverage
+          dotnet test ./AgroSolution.Core.Tests/AgroSolution.Core.Tests.csproj -c Release \
+            /p:CollectCoverage=true \
+            /p:CoverletOutputFormat=cobertura \
+            /p:CoverletOutput=$(pwd)/coverage/core.cobertura.xml \
+            "/p:Include=[AgroSolution.Core]AgroSolution.Core.App.Features.ReceiveIoTData.*%2c[AgroSolution.Core]AgroSolution.Core.App.Validation.*" \
+            --no-build --verbosity minimal
+
+      - name: Test - Api (smoke, no coverage threshold)
+        run: |
+          dotnet test ./AgroSolution.Api.Tests/AgroSolution.Api.Tests.csproj -c Release --no-build --verbosity minimal
+
+      # IntegrationTests skipped until tests are implemented (Features/ is empty)
+      # - name: Test - Integration (coverage)
+      #   run: |
+      #     dotnet test ./AgroSolution.IntegrationTests/AgroSolution.IntegrationTests.csproj -c Release \
+      #       /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=$(pwd)/coverage/integration.cobertura.xml --no-build --verbosity minimal
+
+      - name: Debug coverage files
+        run: |
+          echo 'Coverage directory listing:'
+          ls -la coverage || true
+          for f in coverage/*.cobertura.xml; do
+            if [ -f "$f" ]; then
+              echo "---- start $f ----"
+              sed -n '1,120p' "$f" || true
+              echo "---- end $f ----"
+            fi
+          done || true
+
+      - name: Validate coverage threshold
+        env:
+          # Scope: ReceiveIoTData + Validation namespaces only (scoped to tested features)
+          # Current baseline: ~59%. Raise threshold as new tests are added.
+          COVERAGE_THRESHOLD: 55
+        run: |
+          chmod +x .github/scripts/check_coverage.sh
+          ./.github/scripts/check_coverage.sh
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage

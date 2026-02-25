@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>agrosolution-worker-2026</UserSecretsId>
+        <RootNamespace>AgroSolution.Worker</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- RabbitMQ client – 6.x kept intentionally: stable sync/async dual API,
+             DispatchConsumersAsync=true enables AsyncEventingBasicConsumer -->
+        <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\AgroSolution.Core\AgroSolution.Core.csproj" />
+    </ItemGroup>
+
+</Project>

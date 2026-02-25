@@ -1,0 +1,25 @@
+**/.vs
+**/.git
+**/.gitignore
+**/bin
+**/obj
+**/*.user
+**/*.suo
+**/TestResults
+**/coverage
+**/node_modules
+
+# Not needed in image build
+docker-compose*.yml
+docker/
+.env*
+*.md
+*.sln
+run_logs/
+docs/
+.ai-docs/
+
+# Test projects — excluded from production image
+AgroSolution.Core.Tests/
+AgroSolution.Api.Tests/
+AgroSolution.IntegrationTests/

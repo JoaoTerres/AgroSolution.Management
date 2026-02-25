@@ -22,9 +22,116 @@ namespace AgroSolution.Core.Infra.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("AgroSolution.Core.Domain.Entities.Alert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("message");
+
+                    b.Property<Guid>("PlotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plot_id");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<DateTime>("TriggeredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("triggered_at");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlotId")
+                        .HasDatabaseName("ix_alerts_plot_id");
+
+                    b.HasIndex("PlotId", "Type", "IsActive")
+                        .HasDatabaseName("ix_alerts_plot_type_active");
+
+                    b.ToTable("alerts", (string)null);
+                });
+
+            modelBuilder.Entity("AgroSolution.Core.Domain.Entities.IoTData", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("DeviceTimestamp")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("device_timestamp");
+
+                    b.Property<int>("DeviceType")
+                        .HasColumnType("integer")
+                        .HasColumnName("device_type");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<Guid>("PlotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plot_id");
+
+                    b.Property<DateTime?>("ProcessingCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processing_completed_at");
+
+                    b.Property<string>("ProcessingQueueId")
+                        .HasColumnType("text")
+                        .HasColumnName("processing_queue_id");
+
+                    b.Property<DateTime?>("ProcessingStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processing_started_at");
+
+                    b.Property<int>("ProcessingStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("processing_status");
+
+                    b.Property<string>("RawData")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("raw_data");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlotId")
+                        .HasDatabaseName("ix_iot_data_plot_id");
+
+                    b.HasIndex("ProcessingStatus")
+                        .HasDatabaseName("ix_iot_data_processing_status");
+
+                    b.HasIndex("ReceivedAt")
+                        .HasDatabaseName("ix_iot_data_received_at");
+
+                    b.HasIndex("PlotId", "ReceivedAt")
+                        .HasDatabaseName("ix_iot_data_plot_timestamp");
+
+                    b.ToTable("iot_data", (string)null);
+                });
+
             modelBuilder.Entity("AgroSolution.Core.Domain.Entities.Plot", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("AreaInHectares")
@@ -53,6 +160,7 @@ namespace AgroSolution.Core.Infra.Data.Migrations
             modelBuilder.Entity("AgroSolution.Core.Domain.Entities.Property", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Location")

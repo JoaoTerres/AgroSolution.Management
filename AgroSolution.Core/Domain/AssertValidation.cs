@@ -34,4 +34,40 @@ public static class AssertValidation
     {
         if (value <= min) throw new DomainException(message);
     }
+
+    /// <summary>
+    /// Valida se um valor não é nulo
+    /// </summary>
+    public static void NotNull(object? obj, string paramName)
+    {
+        if (obj == null)
+            throw new DomainException($"O parâmetro '{paramName}' não pode ser nulo.");
+    }
+
+    /// <summary>
+    /// Valida se uma string não é nula ou vazia
+    /// </summary>
+    public static void NotNullOrEmpty(string? value, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new DomainException($"O parâmetro '{paramName}' não pode ser nulo ou vazio.");
+    }
+
+    /// <summary>
+    /// Valida se um Guid não está vazio
+    /// </summary>
+    public static void NotEmpty(Guid value, string paramName)
+    {
+        if (value == Guid.Empty)
+            throw new DomainException($"O parâmetro '{paramName}' não pode ser Guid vazio.");
+    }
+
+    /// <summary>
+    /// Valida se um enum tem um valor válido
+    /// </summary>
+    public static void IsValidEnum<T>(T value, string paramName) where T : struct, Enum
+    {
+        if (!Enum.IsDefined(typeof(T), value))
+            throw new DomainException($"O valor '{value}' não é válido para o tipo {typeof(T).Name}.");
+    }
 }

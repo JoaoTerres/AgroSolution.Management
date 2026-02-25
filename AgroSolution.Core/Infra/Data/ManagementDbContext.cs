@@ -12,6 +12,8 @@ public class ManagementDbContext : DbContext
 
     public DbSet<Property> Properties { get; set; }
     public DbSet<Plot> Plots { get; set; }
+    public DbSet<IoTData> IoTData { get; set; }
+    public DbSet<Alert> Alerts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

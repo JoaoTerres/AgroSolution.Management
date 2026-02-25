@@ -1,16 +1,127 @@
-services:
-  db-management:
-    image: postgres:14-alpine
-    container_name: agro_management_db
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: dev
-      POSTGRES_DB: AgroSolutionDb.Management
-    ports:
-      - "5433:5432"
-    volumes:
-      - mgmt_postgres_data:/var/lib/postgresql/data
+# ─────────────────────────────────────────────────────────────────────────────
+# AgroSolution — Local Infrastructure
+#
+# Services contained here:
+#   postgres   → Single PostgreSQL 16 instance hosting TWO databases:
+#                  - agrosolution_management  (Properties, Plots, IoTData)
+#                  - agrosolution_identity    (Producers)
+#   pgadmin    → pgAdmin 4 web UI for browsing/querying both databases
+#                  http://localhost:${PGADMIN_PORT:-54320}
+#   rabbitmq   → RabbitMQ 3.13 with Management UI.
+#                Topology (exchanges/queues/bindings) pre-loaded from
+#                docker/rabbitmq/definitions.json on first start.
+#                  http://localhost:${RABBITMQ_PORT_MGMT:-15672}
+#
+# Quickstart:
+#   cp .env.example .env           ← one-time setup (gitignored)
+#   docker compose up -d           ← start all infra
+#
+# Usage:
+#   docker compose up -d            → start all infra
+#   docker compose up -d postgres   → start only PostgreSQL (+ automatic pgAdmin dep)
+#   docker compose up -d rabbitmq   → start only RabbitMQ
+#   docker compose down             → stop all (data persisted in volumes)
+#   docker compose down -v          → stop + wipe all volumes (fresh start)
+#   docker compose logs -f postgres → tail PostgreSQL logs
+#   docker compose logs -f rabbitmq → tail RabbitMQ logs
+#
+# Management UIs (when running):
+#   PostgreSQL → any PG client on localhost:${POSTGRES_PORT:-5432}
+#   pgAdmin    → http://localhost:${PGADMIN_PORT:-54320}  (credentials from .env)
+#   RabbitMQ   → http://localhost:${RABBITMQ_PORT_MGMT:-15672}
+# ─────────────────────────────────────────────────────────────────────────────
 
+services:
+
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: agrosolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # POSTGRES_DB is intentionally omitted; databases are created by
+      # the init script so we don't depend on a single default DB name.
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Persistent data — survives container restarts
+      - postgres_data:/var/lib/postgresql/data
+      # Init script: creates both databases on first container startup.
+      # To add a new DB: edit docker/postgres/init.sql
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── pgAdmin ────────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: agrosolution-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    ${PGADMIN_EMAIL:-admin@agrosolution.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_LISTEN_PORT:      80
+      # Disable telemetry
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+      PGADMIN_CONFIG_LOGIN_BANNER: '"AgroSolution Local Dev"'
+    ports:
+      - "${PGADMIN_PORT:-54320}:80"
+    volumes:
+      # Persistent pgAdmin state: saved servers, query history
+      - pgadmin_data:/var/lib/pgadmin
+      # Pre-configured server connection — loaded on first pgAdmin startup.
+      # To change server config: edit docker/pgadmin/servers.json
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/misc/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ─── RabbitMQ ───────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: agrosolution-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER:  ${RABBITMQ_DEFAULT_USER:-agro}
+      RABBITMQ_DEFAULT_PASS:  ${RABBITMQ_DEFAULT_PASS:-agro123}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+    ports:
+      # AMQP protocol — used by .NET producer/consumer workers
+      - "${RABBITMQ_PORT_AMQP:-5672}:5672"
+      # Management UI — http://localhost:15672
+      - "${RABBITMQ_PORT_MGMT:-15672}:15672"
+    volumes:
+      # Persistent data — queued messages survive container restarts
+      - rabbitmq_data:/var/lib/rabbitmq
+      # Custom configuration: heartbeat, max message size, structured logging
+      # To edit: docker/rabbitmq/rabbitmq.conf
+      - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      # Pre-loaded topology: exchange iot.events, queues, bindings, dead-letter
+      # To extend: edit docker/rabbitmq/definitions.json + docker compose restart rabbitmq
+      - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+# ─── Volumes ──────────────────────────────────────────────────────────────────
 volumes:
-  mgmt_postgres_data:
+  postgres_data:
+    name: agrosolution_postgres_data
+  pgadmin_data:
+    name: agrosolution_pgadmin_data
+  rabbitmq_data:
+    name: agrosolution_rabbitmq_data

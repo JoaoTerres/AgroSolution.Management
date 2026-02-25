@@ -1,35 +1,65 @@
+using System.Text;
 using AgroSolution.Api.Config;
+using AgroSolution.Api.Middlewares;
 using AgroSolution.Core.Infra.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
-builder.Services.AddIdentityConfiguration(builder.Configuration);
-builder.Services.ResolveDependencies(builder.Configuration);
-builder.Services.AddSwaggerConfiguration();
-builder.Services.AddOpenApi();
+// ─── Database ──────────────────────────────────────────────────────────────
+builder.Services.AddDbContext<ManagementDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("ManagementConnection")));
 
+// ─── Authentication / JWT ──────────────────────────────────────────────────
+var jwtSecret   = builder.Configuration["Jwt:SecretKey"]!;
+var jwtIssuer   = builder.Configuration["Jwt:Issuer"]!;
+var jwtAudience = builder.Configuration["Jwt:Audience"]!;
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ValidateIssuer           = true,
+            ValidIssuer              = jwtIssuer,
+            ValidateAudience         = true,
+            ValidAudience            = jwtAudience,
+            ValidateLifetime         = true,
+            ClockSkew                = TimeSpan.Zero
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// ─── MVC / Swagger / DI ────────────────────────────────────────────────────
+builder.Services.AddControllers();
+builder.Services.AddSwaggerConfiguration();
+builder.Services.ResolveDependencies(builder.Configuration);
+
+// ─── App pipeline ──────────────────────────────────────────────────────────
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+app.UseMiddleware<ExceptionMiddleware>();
+
+if (app.Environment.IsDevelopment())
+    app.UseSwaggerConfiguration();
+
+app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+
+// ─── Auto-migrate on startup (dev only) ───────────────────────────────────
+if (app.Environment.IsDevelopment())
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ManagementDbContext>();
     db.Database.Migrate();
 }
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwaggerConfiguration();
-    app.MapOpenApi();
-}
-
-app.UseHttpsRedirection();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
 
 app.Run();
