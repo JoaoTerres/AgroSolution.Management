@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Restore ──────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS restore
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS restore
 WORKDIR /src
 
 COPY AgroSolution.Management.sln                                        ./
@@ -14,8 +14,8 @@ COPY AgroSolution.Identity/AgroSolution.Identity.csproj                 AgroSolu
 RUN dotnet restore AgroSolution.Identity/AgroSolution.Identity.csproj
 
 # ── Stage 2: Build & Publish ──────────────────────────────────────────────────
+# Extend restore stage so obj/project.assets.json is available for --no-restore
 FROM restore AS publish
-WORKDIR /src
 
 COPY AgroSolution.Identity/ AgroSolution.Identity/
 
@@ -25,11 +25,12 @@ RUN dotnet publish AgroSolution.Identity/AgroSolution.Identity.csproj \
     -o /app/publish \
     /p:UseAppHost=false
 
-# ── Stage 3: Runtime ──────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+# ── Stage 3: Runtime (alpine — ~100 MB vs ~220 MB debian) ───────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
 WORKDIR /app
 
-RUN addgroup --system agro && adduser --system --ingroup agro agro
+# Non-root user (Alpine/BusyBox syntax)
+RUN addgroup -S agro && adduser -S -G agro agro
 USER agro
 
 COPY --from=publish /app/publish .

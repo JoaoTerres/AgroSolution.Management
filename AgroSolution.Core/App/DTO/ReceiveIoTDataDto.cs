@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace AgroSolution.Core.App.DTO;
@@ -49,6 +50,8 @@ public class ReceiveIoTDataDto
     /// Dados brutos do dispositivo em formato JSON
     /// Será validado conforme o tipo de dispositivo
     /// </summary>
+    [Required(ErrorMessage = "RawData é obrigatório")]
+    [MinLength(2, ErrorMessage = "RawData deve conter um payload JSON válido")]
     [JsonPropertyName("data")]
     public required string RawData { get; set; }
 

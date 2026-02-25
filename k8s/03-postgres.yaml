@@ -1,0 +1,119 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PostgreSQL 16 — StatefulSet + PersistentVolumeClaim + Service
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: agrosolution
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agrosolution-postgres
+  namespace: agrosolution
+  labels:
+    app: postgres
+spec:
+  serviceName: agrosolution-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: agrosolution-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agrosolution-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            # Low-price server profile (Postgres needs at least 128Mi to init)
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: init-sql
+          configMap:
+            name: postgres-init-sql
+
+---
+# Headless service for StatefulSet DNS resolution
+apiVersion: v1
+kind: Service
+metadata:
+  name: agrosolution-postgres
+  namespace: agrosolution
+  labels:
+    app: postgres
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+# ConfigMap with DB initialisation script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: agrosolution
+data:
+  init.sql: |
+    -- Create management database (idempotent)
+    SELECT 'CREATE DATABASE agrosolution_management'
+    WHERE NOT EXISTS (
+        SELECT FROM pg_database WHERE datname = 'agrosolution_management'
+    )\gexec
+
+    -- Create identity database (idempotent)
+    SELECT 'CREATE DATABASE agrosolution_identity'
+    WHERE NOT EXISTS (
+        SELECT FROM pg_database WHERE datname = 'agrosolution_identity'
+    )\gexec

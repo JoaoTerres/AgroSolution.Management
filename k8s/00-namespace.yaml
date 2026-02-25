@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agrosolution
+  labels:
+    app.kubernetes.io/managed-by: kubectl
+    environment: production

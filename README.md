@@ -109,7 +109,7 @@ Get-Process dotnet | Stop-Process -Force
 
 ---
 
-## Quick Start (local) — passo a passo manual
+## Quick Start (passo a passo manual)
 
 Prefere executar etapa por etapa? Siga o guia abaixo.
 
@@ -203,27 +203,11 @@ dotnet test
 
 ---
 
-## Indice de documentacao
-
-| Secao | Link |
-|---|---|
-| Arquitetura | [01-Arquitetura](../01-Arquitetura) |
-| Especificacoes | [02-Especificacoes](../02-Especificacoes) |
-| Guias de Desenvolvimento | [03-GuiasDesenvolvimento](../03-GuiasDesenvolvimento) |
-| API Reference | [04-API](../04-API) |
-| Banco de Dados | [05-Banco-de-Dados](../05-Banco-de-Dados) |
-| Testes | [06-Testes](../06-Testes) |
-| Seguranca | [07-Seguranca](../07-Seguranca) |
-| Deploy / CI-CD | [08-Deploy](../08-Deploy) |
-| FAQ | [09-FAQ](../09-FAQ) |
-
----
-
 ## Performance Medida (Benchmark)
 
-> Valores **reais** coletados com `.scripts/Invoke-LoadTest.ps1`  
-> Ambiente: docker-compose local, PostgreSQL + RabbitMQ em containers, Windows 12-core  
-> Configuracao: **10 workers concorrentes x 30 segundos** — 3.497 escritas + 3.496 leituras
+> Valores **reais** coletados com `.scripts/Invoke-LoadTest.ps1`
+> Ambiente: docker-compose local, PostgreSQL + RabbitMQ em containers, Windows 12-core
+> Configuração: **10 workers concorrentes x 30 segundos** — 3.497 escritas + 3.496 leituras
 
 | Endpoint | RPS | Min ms | P50 ms | P95 ms | P99 ms | Sucesso |
 |---|---|---|---|---|---|---|
@@ -235,9 +219,11 @@ dotnet test
 .\.scripts\Invoke-LoadTest.ps1 -DurationSeconds 30 -Concurrency 10
 ```
 
+---
+
 ## Limites de recursos (Kubernetes — servidor low-price 2 vCPU / 2 GB)
 
-| Servico | CPU req | CPU lim | Mem req | Mem lim | Imagem base |
+| Serviço | CPU req | CPU lim | Mem req | Mem lim | Imagem base |
 |---|---|---|---|---|---|
 | Api | 75m | 200m | 96 Mi | 192 Mi | aspnet:9.0-alpine |
 | Identity | 75m | 200m | 96 Mi | 192 Mi | aspnet:9.0-alpine |
@@ -247,9 +233,26 @@ dotnet test
 | Prometheus | 50m | 200m | 64 Mi | 192 Mi | prom/prometheus |
 | Grafana | 50m | 150m | 64 Mi | 128 Mi | grafana/grafana |
 
-> Imagens Alpine reduzem o tamanho de **~220 MB para ~100 MB** por servico.  
-> Budget total: 500m CPU req / 640 Mi RAM req — compativel com 2 vCPU / 2 GB.
+> Imagens Alpine reduzem o tamanho de **~220 MB para ~100 MB** por serviço.
+> Budget total: 500m CPU req / 640 Mi RAM req — compatível com 2 vCPU / 2 GB.
 
 ---
 
-**Proximo passo:** Leia [Arquitetura](../01-Arquitetura) para entender a estrutura do projeto.
+## Documentação completa
+
+| Seção | Link |
+|---|---|
+| README detalhado | [docs/00-README](docs/00-README/README.md) |
+| Arquitetura | [docs/01-Arquitetura](docs/01-Arquitetura) |
+| Especificações | [docs/02-Especificacoes](docs/02-Especificacoes) |
+| Guias de Desenvolvimento | [docs/03-GuiasDesenvolvimento](docs/03-GuiasDesenvolvimento) |
+| API Reference | [docs/04-API](docs/04-API) |
+| Banco de Dados | [docs/05-Banco-de-Dados](docs/05-Banco-de-Dados) |
+| Testes | [docs/06-Testes](docs/06-Testes) |
+| Segurança | [docs/07-Seguranca](docs/07-Seguranca) |
+| Deploy / CI-CD | [docs/08-Deploy](docs/08-Deploy) |
+| FAQ | [docs/09-FAQ](docs/09-FAQ) |
+
+---
+
+**Próximo passo:** Leia [Arquitetura](docs/01-Arquitetura) para entender a estrutura do projeto.

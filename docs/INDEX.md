@@ -1,8 +1,8 @@
 # AgroSolution.Management - Índice de Documentação
 
 **Atualizado:** 25/02/2026  
-**Versão:** 2.1  
-**Status:** Etapa 2 Concluída | Etapa 3 Iniciando
+**Versão:** 3.0  
+**Status:** Etapa 3 Em Andamento
 
 ---
 
@@ -31,13 +31,14 @@
 | FR-00 — IoT data ingestion | ✅ Concluído | `79701d3` |
 | FR-01 — Autenticação JWT (Identity) | ✅ Concluído | `fb65638` |
 | FR-04 — Dashboard IoT por talhão | ✅ Concluído | `6d41432` |
-| FR-05 — Motor de Alertas (DroughtRule) | ✅ Concluído | `6d41432` |
-| FR-05 — Motor de Alertas (ExtremeHeat + HeavyRain) | ✅ Concluído | `67ebe80` |
+| FR-05 — Motor de Alertas (Drought + ExtremeHeat + HeavyRain) | ✅ Concluído | `67ebe80` |
 | GET /api/plots/{id} | ✅ Concluído | `1318a16` |
 | TR-04 — RabbitMQ + Workers + Docker | ✅ Concluído | `2126e15` |
-| CI/CD — GitHub Actions | ✅ Ativo | `.github/workflows/ci.yml` |
-| TR-02 — Kubernetes manifests | ❌ Não iniciado | — |
-| TR-03 — Observabilidade (Prometheus) | ❌ Não iniciado | — |
+| CI/CD — GitHub Actions (build + test + coverage) | ✅ Ativo | `.github/workflows/ci.yml` |
+| TR-05 — Docker build + push to GHCR no CI | ✅ Concluído | `3fcfe4d` |
+| TR-02 — Kubernetes manifests (k8s/) | ✅ Concluído | `3fcfe4d` |
+| TR-03 — Prometheus /metrics + Grafana dashboard | ✅ Concluído | `3fcfe4d` |
+| D-01 — Architecture diagram | ❌ Não iniciado | — |
 
 ---
 

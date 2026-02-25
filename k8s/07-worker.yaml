@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AgroSolution.Worker — Deployment (no public port; internal processor only)
+# Image: ghcr.io/joaotorres/agrosolution-worker:latest
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrosolution-worker
+  namespace: agrosolution
+  labels:
+    app: agrosolution-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agrosolution-worker
+  template:
+    metadata:
+      labels:
+        app: agrosolution-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/joaotorres/agrosolution-worker:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: agrosolution-config
+            - secretRef:
+                name: agrosolution-secrets
+          resources:
+            # Low-price server profile (Worker is lighter — no HTTP listener)
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "150m"
+              memory: "128Mi"

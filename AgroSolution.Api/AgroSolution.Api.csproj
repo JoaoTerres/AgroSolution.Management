@@ -14,6 +14,7 @@
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />
+        <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
         <PackageReference Include="v24.OpenApi.Models" Version="2.0.45" />
     </ItemGroup>
