@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -139,20 +139,23 @@ jobs:
         with:
           version: 'v1.30.0'
 
-      - name: Validate manifests (dry-run client)
+      # kubeconform: static schema validator -- does NOT require a running cluster
+      - name: Install kubeconform
         run: |
-          kubectl apply --dry-run=client --validate=false -f k8s/00-namespace.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/01-configmap.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/02-secret.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/03-postgres.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/04-rabbitmq.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/05-api.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/06-identity.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/07-worker.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/08-prometheus.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/09-grafana.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/10-ingress.yaml
-          kubectl apply --dry-run=client --validate=false -f k8s/11-networkpolicy.yaml
+          curl -sSLo /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
+
+      - name: Validate manifests (kubeconform)
+        run: |
+          kubeconform \
+            -strict \
+            -kubernetes-version 1.30.0 \
+            -ignore-missing-schemas \
+            -summary \
+            k8s/
 
       - name: Detect optional secrets
         id: check-secrets
