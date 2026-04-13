@@ -32,7 +32,7 @@ jobs:
             /p:CollectCoverage=true \
             /p:CoverletOutputFormat=cobertura \
             /p:CoverletOutput=$(pwd)/coverage/core.cobertura.xml \
-            "/p:Include=[AgroSolution.Core]AgroSolution.Core.App.Features.ReceiveIoTData.*%2c[AgroSolution.Core]AgroSolution.Core.App.Validation.*" \
+            "/p:Exclude=[AgroSolution.Core]AgroSolution.Core.Infra.*" \
             --no-build --verbosity minimal
 
       - name: Test - Api (smoke, no coverage threshold)
